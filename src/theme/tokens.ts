@@ -6,7 +6,8 @@ export const palette = {
     muted: "#7A6F64",
     border: "#E8DFD0",
     primary: "#E8833A",
-    onPrimary: "#FFFDF8",
+    // Ink, not paper: paper-white on this orange is only 2.7:1.
+    onPrimary: "#2B2622",
     accent: "#F4C542",
     secondary: "#4F7C6B",
     star: "#F4B400",

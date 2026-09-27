@@ -9,12 +9,11 @@ import { useEffect } from "react";
 
 import { ToastProvider } from "@/components/toast";
 import { migrateDbIfNeeded } from "@/db/migrate";
-import { useTheme } from "@/theme/use-theme";
+import { ThemeProvider, useTheme } from "@/theme/use-theme";
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const { colors, isDark } = useTheme();
   const [fontsLoaded, fontError] = useFonts({
     Lora_400Regular,
     Lora_600SemiBold,
@@ -28,27 +27,41 @@ export default function RootLayout() {
     if (ready) SplashScreen.hide();
   }, [ready]);
 
+  if (!ready) return null;
+
+  return (
+    <ThemeProvider>
+      <SQLiteProvider databaseName="ducktionary.db" onInit={migrateDbIfNeeded}>
+        <ToastProvider>
+          <AppShell />
+        </ToastProvider>
+      </SQLiteProvider>
+    </ThemeProvider>
+  );
+}
+
+/** Everything that needs the theme lives below the ThemeProvider. */
+function AppShell() {
+  const { colors, isDark } = useTheme();
+
   // The root window shows through during screen transitions — paint it the app background
-  // (and repaint on light/dark switch) so pushes, pops and tab jumps don't flash white.
+  // (and repaint on theme changes) so pushes, pops and tab jumps don't flash white.
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(colors.background);
   }, [colors.background]);
 
-  if (!ready) return null;
-
   return (
-    <SQLiteProvider databaseName="ducktionary.db" onInit={migrateDbIfNeeded}>
-      <ToastProvider>
-        <StatusBar style={isDark ? "light" : "dark"} />
-        {/* Tabs live in (tabs); full-screen flows like the scanner sit above them. */}
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen
-            name="scan"
-            options={{ presentation: "fullScreenModal", animation: "slide_from_bottom" }}
-          />
-        </Stack>
-      </ToastProvider>
-    </SQLiteProvider>
+    <>
+      <StatusBar style={isDark ? "light" : "dark"} />
+      {/* Tabs live in (tabs); full-screen flows like the scanner and settings sit above them. */}
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen
+          name="scan"
+          options={{ presentation: "fullScreenModal", animation: "slide_from_bottom" }}
+        />
+        <Stack.Screen name="settings" />
+      </Stack>
+    </>
   );
 }

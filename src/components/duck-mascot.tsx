@@ -12,19 +12,22 @@ type DuckMascotProps = {
 /** Placeholder vector duck. Swap the drawing for illustrated art later; the props stay the same. */
 export function DuckMascot({ mood = "reading", size = 120 }: DuckMascotProps) {
   const { colors } = useTheme();
+  // The duck is the same duck in every colour scheme — only its book and props follow the theme.
   const ink = "#2B2622";
+  const body = "#F4C542";
   const wing = "#E3AE2A";
+  const bill = "#E8833A";
 
   return (
     <Svg width={size} height={size} viewBox="0 0 120 120" accessibilityLabel={`Duck mascot, ${mood}`}>
       {/* tail + body */}
-      <Path d="M96 70 L114 58 L106 80 Z" fill={colors.accent} />
-      <Ellipse cx={64} cy={82} rx={42} ry={27} fill={colors.accent} />
+      <Path d="M96 70 L114 58 L106 80 Z" fill={body} />
+      <Ellipse cx={64} cy={82} rx={42} ry={27} fill={body} />
       <Path d="M58 76 Q76 66 92 80 Q78 94 60 88 Z" fill={wing} />
 
       {/* head + bill */}
-      <Circle cx={42} cy={46} r={23} fill={colors.accent} />
-      <Path d="M22 47 Q6 44 4 51 Q9 58 25 55 Z" fill={colors.primary} />
+      <Circle cx={42} cy={46} r={23} fill={body} />
+      <Path d="M22 47 Q6 44 4 51 Q9 58 25 55 Z" fill={bill} />
 
       {/* eye */}
       {mood === "sleepy" ? (
