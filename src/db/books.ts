@@ -1,6 +1,7 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 
-import type { Book, BookDraft } from "@/types";
+import type { Acquisition, Book, BookDraft, BookFormat } from "@/types";
+import { ACQUISITIONS, FORMATS, isPriced } from "@/utils/book-attributes";
 
 type BookRow = {
   id: number;
@@ -13,6 +14,9 @@ type BookRow = {
   finished_at: string;
   rating: number | null;
   comment: string | null;
+  price_cents: number | null;
+  format: string | null;
+  acquisition: string | null;
   created_at: string;
   categories: string;
 };
@@ -38,6 +42,9 @@ function toBook(row: BookRow): Book {
     rating: row.rating,
     comment: row.comment,
     categories: (JSON.parse(row.categories) as string[]).sort((a, b) => a.localeCompare(b)),
+    priceCents: row.price_cents,
+    format: FORMATS.some((f) => f.value === row.format) ? (row.format as BookFormat) : null,
+    acquisition: ACQUISITIONS.some((a) => a.value === row.acquisition) ? (row.acquisition as Acquisition) : null,
     createdAt: row.created_at,
   };
 }
@@ -76,6 +83,13 @@ function toParams(draft: BookDraft) {
     $finished_at: draft.finishedAt,
     $rating: normalizeRating(draft.rating),
     $comment: draft.comment?.trim() || null,
+    // Prices only belong to bought books; a gift or loan never counts as money spent.
+    $price_cents:
+      draft.priceCents != null && draft.priceCents >= 0 && isPriced(draft.acquisition)
+        ? Math.round(draft.priceCents)
+        : null,
+    $format: draft.format,
+    $acquisition: draft.acquisition,
   };
 }
 
@@ -116,8 +130,10 @@ export async function insertBook(db: SQLiteDatabase, draft: BookDraft): Promise<
   let id = 0;
   await db.withExclusiveTransactionAsync(async (txn) => {
     const result = await txn.runAsync(
-      `INSERT INTO books (isbn, title, authors, pages, cover_url, started_at, finished_at, rating, comment)
-       VALUES ($isbn, $title, $authors, $pages, $cover_url, $started_at, $finished_at, $rating, $comment)`,
+      `INSERT INTO books (isbn, title, authors, pages, cover_url, started_at, finished_at, rating, comment,
+                          price_cents, format, acquisition)
+       VALUES ($isbn, $title, $authors, $pages, $cover_url, $started_at, $finished_at, $rating, $comment,
+               $price_cents, $format, $acquisition)`,
       params,
     );
     id = result.lastInsertRowId;
@@ -132,7 +148,8 @@ export async function updateBook(db: SQLiteDatabase, id: number, draft: BookDraf
     await txn.runAsync(
       `UPDATE books SET isbn = $isbn, title = $title, authors = $authors, pages = $pages,
          cover_url = $cover_url, started_at = $started_at, finished_at = $finished_at,
-         rating = $rating, comment = $comment
+         rating = $rating, comment = $comment,
+         price_cents = $price_cents, format = $format, acquisition = $acquisition
        WHERE id = $id`,
       { ...params, $id: id },
     );

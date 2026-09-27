@@ -1,6 +1,6 @@
 import { deviceLanguage, fetchJson } from "@/api/http";
 import { cleanSubjects, type SearchResult } from "@/api/search-result";
-import type { BookDraft } from "@/types";
+import type { BookDraft, BookFormat } from "@/types";
 import { todayIso } from "@/utils/dates";
 import { normalizeIsbn } from "@/utils/isbn";
 
@@ -98,6 +98,9 @@ function toResult(doc: WorkDoc, knownIsbn: string | null): SearchResult {
       rating: null,
       comment: null,
       categories: cleanSubjects(doc.subject ?? []),
+      priceCents: null,
+      format: null,
+      acquisition: null,
     },
   };
 }
@@ -109,6 +112,8 @@ type EditionRecord = {
   covers?: number[];
   subjects?: string[];
   works?: { key: string }[];
+  /** Free text, e.g. "Hardcover", "Mass Market Paperback", "E-book". */
+  physical_format?: string;
 };
 
 type WorkRecord = {
@@ -151,7 +156,19 @@ export async function lookupOpenLibraryEdition(isbn: string, signal?: AbortSigna
     rating: null,
     comment: null,
     categories: cleanSubjects(edition.subjects ?? work?.subjects ?? []),
+    priceCents: null,
+    format: formatFromPhysical(edition.physical_format),
+    acquisition: null,
   };
+}
+
+/** Maps Open Library's free-text physical format onto ours, or null when it's unclear. */
+export function formatFromPhysical(physical: string | undefined): BookFormat | null {
+  const text = (physical ?? "").toLowerCase();
+  if (/e-?book|kindle|epub|electronic/.test(text)) return "ebook";
+  if (/hard ?(cover|back)|hardbound/.test(text)) return "hardcover";
+  if (/paper ?(back|bound)|softcover|soft cover|mass market/.test(text)) return "paperback";
+  return null;
 }
 
 function firstIsbn13(isbns: string[] | undefined): string | null {

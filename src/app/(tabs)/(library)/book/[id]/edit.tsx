@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { StyleSheet } from "react-native";
 
 import { BookForm } from "@/components/book-form";
+import { useConfirm } from "@/components/confirm-dialog";
 import { Button } from "@/components/button";
 import { EmptyState } from "@/components/empty-state";
 import { Screen } from "@/components/screen";
@@ -13,7 +14,6 @@ import { useBook } from "@/hooks/use-books";
 import { useFocusLoader } from "@/hooks/use-focus-loader";
 import type { Book, BookDraft } from "@/types";
 import { bookToDraft } from "@/utils/book-form";
-import { askToConfirm } from "@/utils/confirm";
 
 export default function EditBookScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -40,6 +40,7 @@ export default function EditBookScreen() {
 function EditForm({ book }: { book: Book }) {
   const db = useSQLiteContext();
   const toast = useToast();
+  const confirm = useConfirm();
   // Captured once so refetches on focus don't reset what the user is typing.
   const [initial] = useState(() => bookToDraft(book));
   const loadCategories = useCallback(() => listCategories(db), [db]);
@@ -47,7 +48,7 @@ function EditForm({ book }: { book: Book }) {
 
   const save = async (draft: BookDraft) => {
     if (draft.isbn && draft.isbn !== book.isbn && (await hasIsbn(db, draft.isbn))) {
-      const proceed = await askToConfirm({
+      const proceed = await confirm({
         title: "ISBN already used",
         message: "Another book in your library has this ISBN. Save anyway?",
         confirmText: "Save anyway",

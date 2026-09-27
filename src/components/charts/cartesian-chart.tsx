@@ -21,13 +21,24 @@ type CartesianChartProps = {
   variant: "bar" | "line";
   unit: { one: string; many: string };
   accessibilityLabel: string;
+  /** Compact value for ticks and the peak label (default: 4.4k). */
+  formatShort?: (value: number) => string;
+  /** Exact value for the detail line; when given, the unit words are left out (e.g. "12,99 €"). */
+  formatFull?: (value: number) => string;
 };
 
 /**
  * Single-series column or line chart on one shared axis. The peak is labelled by default; tapping
  * a column/point moves the label there and names it underneath, so values never depend on hover.
  */
-export function CartesianChart({ bars, variant, unit, accessibilityLabel }: CartesianChartProps) {
+export function CartesianChart({
+  bars,
+  variant,
+  unit,
+  accessibilityLabel,
+  formatShort = formatCount,
+  formatFull,
+}: CartesianChartProps) {
   const { colors } = useTheme();
   const [width, setWidth] = useState(0);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -83,7 +94,7 @@ export function CartesianChart({ bars, variant, unit, accessibilityLabel }: Cart
                 fill={colors.muted}
                 textAnchor="end"
               >
-                {formatCount(tick)}
+                {formatShort(tick)}
               </SvgText>
             ))}
 
@@ -130,7 +141,7 @@ export function CartesianChart({ bars, variant, unit, accessibilityLabel }: Cart
                 fill={colors.text}
                 textAnchor="middle"
               >
-                {formatCount(activeBar.value)}
+                {formatShort(activeBar.value)}
               </SvgText>
             )}
 
@@ -158,7 +169,9 @@ export function CartesianChart({ bars, variant, unit, accessibilityLabel }: Cart
             <Pressable
               key={bar.key}
               style={styles.hit}
-              accessibilityLabel={`${bar.label}: ${bar.value} ${bar.value === 1 ? unit.one : unit.many}`}
+              accessibilityLabel={`${bar.label}: ${
+                formatFull ? formatFull(bar.value) : `${bar.value} ${bar.value === 1 ? unit.one : unit.many}`
+              }`}
               onPress={() => setSelectedKey(bar.key)}
             />
           ))}
@@ -167,7 +180,11 @@ export function CartesianChart({ bars, variant, unit, accessibilityLabel }: Cart
 
       <AppText variant="caption" color="muted" style={styles.detail}>
         {activeBar
-          ? `${activeBar.label}: ${activeBar.value.toLocaleString()} ${activeBar.value === 1 ? unit.one : unit.many}`
+          ? `${activeBar.label}: ${
+              formatFull
+                ? formatFull(activeBar.value)
+                : `${activeBar.value.toLocaleString()} ${activeBar.value === 1 ? unit.one : unit.many}`
+            }`
           : "Nothing to show yet."}
         {activeBar && selected < 0 ? ` (highest) · tap a ${variant === "bar" ? "column" : "point"} for others` : ""}
       </AppText>

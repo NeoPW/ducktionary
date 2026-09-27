@@ -18,6 +18,7 @@ import { rangeLabel, resolveRange, stepRange, type RangeKind, type StatsRange } 
 import { fonts, radii, spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
 import type { IsoDate } from "@/types";
+import { formatPrice } from "@/utils/book-attributes";
 import { toIsoDate, todayIso } from "@/utils/dates";
 
 const KINDS: readonly { value: RangeKind; label: string }[] = [
@@ -196,6 +197,16 @@ function Tiles({ summary }: { summary: Summary }) {
         detail={summary.topCategory ? plural(summary.topCategory.books, { one: "book", many: "books" }) : undefined}
       />
       <StatTile label="Authors" value={summary.authors.toLocaleString()} detail="different authors" />
+      <StatTile
+        label="Spent"
+        value={summary.pricedBooks ? formatPrice(summary.spentCents) : "–"}
+        detail={summary.pricedBooks ? `on ${plural(summary.pricedBooks, { one: "book", many: "books" })}` : "no prices yet"}
+      />
+      <StatTile
+        label="Average price"
+        value={summary.pricedBooks ? formatPrice(Math.round(summary.spentCents / summary.pricedBooks)) : "–"}
+        detail="per bought book"
+      />
     </View>
   );
 }

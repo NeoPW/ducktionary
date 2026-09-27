@@ -14,8 +14,15 @@ export type Book = {
   rating: number | null;
   comment: string | null;
   categories: string[];
+  /** Whole cents (EUR). Only meaningful for bought books. */
+  priceCents: number | null;
+  format: BookFormat | null;
+  acquisition: Acquisition | null;
   createdAt: string;
 };
+
+export type BookFormat = "hardcover" | "paperback" | "ebook";
+export type Acquisition = "bought" | "gift" | "borrowed";
 
 /** A book before it is saved — from Open Library, a scan, or manual entry. */
 export type BookDraft = Omit<Book, "id" | "createdAt">;

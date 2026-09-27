@@ -5,6 +5,7 @@ import { StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/app-text";
 import { BookForm } from "@/components/book-form";
+import { useConfirm } from "@/components/confirm-dialog";
 import { DuckMascot } from "@/components/duck-mascot";
 import { useToast } from "@/components/toast";
 import { hasIsbn, insertBook, listCategories } from "@/db/books";
@@ -13,7 +14,6 @@ import { radii, spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
 import type { BookDraft } from "@/types";
 import { blankDraft } from "@/utils/book-form";
-import { askToConfirm } from "@/utils/confirm";
 import { todayIso } from "@/utils/dates";
 
 function parseDraft(param: string | undefined): BookDraft {
@@ -31,6 +31,7 @@ export default function ConfirmBookScreen() {
   const db = useSQLiteContext();
   const { colors } = useTheme();
   const toast = useToast();
+  const confirm = useConfirm();
   const { draft: draftParam, notFound } = useLocalSearchParams<{ draft?: string; notFound?: string }>();
   const [initial] = useState(() => parseDraft(draftParam));
   const [duplicate, setDuplicate] = useState(false);
@@ -49,7 +50,7 @@ export default function ConfirmBookScreen() {
 
   const save = async (draft: BookDraft) => {
     if (draft.isbn && draft.isbn !== initial.isbn && (await hasIsbn(db, draft.isbn))) {
-      const proceed = await askToConfirm({
+      const proceed = await confirm({
         title: "Already in your library",
         message: "A book with this ISBN is already logged. Add it again?",
         confirmText: "Add again",

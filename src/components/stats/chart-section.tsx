@@ -13,6 +13,7 @@ import type { DateSpan } from "@/stats/range";
 import { radii, spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
 import type { Book } from "@/types";
+import { formatPrice } from "@/utils/book-attributes";
 
 const OPTIONS = CHARTS.map((c) => ({ value: c.kind, label: c.label }));
 const STYLE_LABELS: Record<ChartStyle, string> = { bar: "Bars", line: "Line", pie: "Pie" };
@@ -42,7 +43,10 @@ export function ChartSection({ books, span, library }: ChartSectionProps) {
   const style: ChartStyle = chart.styles.includes(preferredStyle) ? preferredStyle : "bar";
   const title = CHARTS.find((c) => c.kind === kind)?.label ?? "";
   const empty = chart.bars.every((b) => b.value === 0);
-  const summary = `${title}. ${chart.bars.map((b) => `${b.label} ${b.value}`).join(", ")}`;
+  const currency = chart.valueFormat === "currency";
+  const euros = (value: number, whole = false) => formatPrice(Math.round(value * 100), { whole });
+  const fullValue = (value: number) => (currency ? euros(value) : value.toLocaleString());
+  const summary = `${title}. ${chart.bars.map((b) => `${b.label} ${fullValue(b.value)}`).join(", ")}`;
   const note = [
     chart.note,
     style === "pie" && chart.layout === "rows"
@@ -80,6 +84,8 @@ export function ChartSection({ books, span, library }: ChartSectionProps) {
               variant={style === "line" ? "line" : "bar"}
               unit={chart.unit}
               accessibilityLabel={summary}
+              formatShort={currency ? (v) => euros(v, true) : undefined}
+              formatFull={currency ? euros : undefined}
             />
             <Pressable accessibilityRole="button" hitSlop={8} onPress={() => setShowTable((v) => !v)}>
               <AppText variant="label" color="primary">
@@ -93,7 +99,7 @@ export function ChartSection({ books, span, library }: ChartSectionProps) {
                     <AppText variant="label" color="muted">
                       {bar.label}
                     </AppText>
-                    <AppText variant="label">{bar.value.toLocaleString()}</AppText>
+                    <AppText variant="label">{fullValue(bar.value)}</AppText>
                   </View>
                 ))}
               </View>

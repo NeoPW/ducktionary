@@ -7,6 +7,8 @@ import { AppText } from "@/components/app-text";
 import { BookCover } from "@/components/book-cover";
 import { Button } from "@/components/button";
 import { ChipInput } from "@/components/form/chip-input";
+import { useConfirm } from "@/components/confirm-dialog";
+import { ChoiceChips } from "@/components/form/choice-chips";
 import { DateField } from "@/components/form/date-field";
 import { RatingField } from "@/components/form/rating-field";
 import { TextField } from "@/components/form/text-field";
@@ -14,7 +16,7 @@ import { spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
 import type { BookDraft } from "@/types";
 import { draftToForm, formToDraft, type BookFormErrors, type BookFormState } from "@/utils/book-form";
-import { askToConfirm } from "@/utils/confirm";
+import { ACQUISITIONS, FORMATS, isPriced } from "@/utils/book-attributes";
 import { todayIso } from "@/utils/dates";
 
 type BookFormProps = {
@@ -34,6 +36,7 @@ export function BookForm({ initial, submitLabel, onSubmit, categorySuggestions, 
   const { colors } = useTheme();
   const headerHeight = useHeaderHeight();
   const navigation = useNavigation();
+  const confirm = useConfirm();
   const [initialForm] = useState<BookFormState>(() => draftToForm(initial));
   const [form, setForm] = useState<BookFormState>(initialForm);
   const [errors, setErrors] = useState<BookFormErrors>({});
@@ -45,10 +48,11 @@ export function BookForm({ initial, submitLabel, onSubmit, categorySuggestions, 
   // Ask before throwing away edits (back button, swipe, header back).
   const dirty = JSON.stringify(form) !== JSON.stringify(initialForm);
   usePreventRemove(dirty && leave == null, ({ data }) => {
-    askToConfirm({
+    confirm({
       title: "Discard changes?",
-      message: "You have unsaved changes to this book.",
+      message: "You have unsaved changes to this book. Leave without saving?",
       confirmText: "Discard",
+      cancelText: "Keep editing",
       destructive: true,
     }).then((discard) => discard && navigation.dispatch(data.action));
   });
@@ -153,6 +157,28 @@ export function BookForm({ initial, submitLabel, onSubmit, categorySuggestions, 
           placeholder="What did you think? Favourite quotes?"
           multiline
         />
+        <ChoiceChips
+          label="Format"
+          options={FORMATS}
+          value={form.format}
+          onChange={(format) => update("format", format)}
+        />
+        <ChoiceChips
+          label="How did you get it?"
+          options={ACQUISITIONS}
+          value={form.acquisition}
+          onChange={(acquisition) => update("acquisition", acquisition)}
+        />
+        {isPriced(form.acquisition) && (
+          <TextField
+            label="Price (€)"
+            value={form.price}
+            onChangeText={(text) => update("price", text)}
+            error={errors.price}
+            keyboardType="decimal-pad"
+            placeholder="12,99"
+          />
+        )}
         <View style={styles.row}>
           <View style={styles.flex}>
             <TextField

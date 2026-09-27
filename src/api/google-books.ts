@@ -89,6 +89,9 @@ function toResult(volume: Volume, knownIsbn: string | null): SearchResult | null
       rating: null,
       comment: null,
       categories: cleanSubjects(info.categories ?? []),
+      priceCents: null,
+      format: null,
+      acquisition: null,
     },
   };
 }

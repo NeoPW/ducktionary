@@ -1,5 +1,6 @@
 import { coverUrlForIsbn } from "@/api/open-library";
-import type { Book, BookDraft, IsoDate } from "@/types";
+import type { Acquisition, Book, BookDraft, BookFormat, IsoDate } from "@/types";
+import { formatPrice, isPriced, parsePrice } from "@/utils/book-attributes";
 import { normalizeIsbn } from "@/utils/isbn";
 
 /** Editable form state: text inputs stay strings until validation. */
@@ -14,9 +15,15 @@ export type BookFormState = {
   rating: number | null;
   comment: string;
   categories: string[];
+  /** As typed, e.g. "12,99". */
+  price: string;
+  format: BookFormat | null;
+  acquisition: Acquisition | null;
 };
 
-export type BookFormErrors = Partial<Record<"title" | "isbn" | "pages" | "startedAt" | "finishedAt", string>>;
+export type BookFormErrors = Partial<
+  Record<"title" | "isbn" | "pages" | "startedAt" | "finishedAt" | "price", string>
+>;
 
 export function draftToForm(draft: BookDraft): BookFormState {
   return {
@@ -30,6 +37,10 @@ export function draftToForm(draft: BookDraft): BookFormState {
     rating: draft.rating,
     comment: draft.comment ?? "",
     categories: draft.categories,
+    // Shown without the currency sign; the field carries its own "€".
+    price: draft.priceCents != null ? formatPrice(draft.priceCents).replace(/[^\d.,]/g, "") : "",
+    format: draft.format,
+    acquisition: draft.acquisition,
   };
 }
 
@@ -56,6 +67,12 @@ export function formToDraft(
   if (!form.finishedAt) errors.finishedAt = "When did you finish it?";
   else if (form.finishedAt > today) errors.finishedAt = "That's in the future — no time-travelling ducks.";
 
+  // Only bought books carry a price; for gifts and loans the field is hidden and ignored.
+  const priceCents = isPriced(form.acquisition) ? parsePrice(form.price) : null;
+  if (priceCents != null && (Number.isNaN(priceCents) || priceCents > 100_000_00)) {
+    errors.price = "Use a price like 12,99.";
+  }
+
   if (form.startedAt && form.startedAt > today) {
     errors.startedAt = "That's in the future.";
   } else if (form.startedAt && form.finishedAt && form.startedAt > form.finishedAt) {
@@ -77,6 +94,9 @@ export function formToDraft(
       rating: form.rating,
       comment: form.comment.trim() || null,
       categories: form.categories,
+      priceCents,
+      format: form.format,
+      acquisition: form.acquisition,
     },
   };
 }
@@ -94,6 +114,9 @@ export function blankDraft(today: IsoDate, prefill: Partial<BookDraft> = {}): Bo
     rating: null,
     comment: null,
     categories: [],
+    priceCents: null,
+    format: null,
+    acquisition: null,
     ...prefill,
   };
 }

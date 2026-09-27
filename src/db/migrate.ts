@@ -41,6 +41,12 @@ const migrations: string[] = [
   `
   DROP TABLE IF EXISTS goals;
   `,
+  // v3: price (whole cents, EUR), format and how the book was acquired.
+  `
+  ALTER TABLE books ADD COLUMN price_cents INTEGER;
+  ALTER TABLE books ADD COLUMN format TEXT;
+  ALTER TABLE books ADD COLUMN acquisition TEXT;
+  `,
 ];
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase) {

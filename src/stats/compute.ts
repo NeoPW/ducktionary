@@ -1,6 +1,7 @@
 import { dayIndex, daysInMonth, elapsedDays, isoFromDayIndex, isoOf, type DateSpan } from "@/stats/range";
 import type { Book, IsoDate } from "@/types";
 import { parseIsoDate, readingDays } from "@/utils/dates";
+import { ACQUISITIONS, FORMATS, isPriced } from "@/utils/book-attributes";
 import { LENGTH_CLASSES, lengthClass } from "@/utils/length-class";
 
 export function booksInSpan(books: Book[], span: DateSpan): Book[] {
@@ -23,9 +24,13 @@ export type Summary = {
   topCategory: { name: string; books: number } | null;
   /** Distinct authors. */
   authors: number;
-  longest: Book | null;
-  fastest: { book: Book; days: number } | null;
-  favourite: Book | null;
+  /** Money spent (cents) on bought books with a price, and how many that is. */
+  spentCents: number;
+  pricedBooks: number;
+  /** Highlights keep every tied book (newest first) so ties can be browsed. Empty when none. */
+  longest: Book[];
+  fastest: { books: Book[]; days: number } | null;
+  favourite: Book[];
 };
 
 /** `books` should already be limited to the span (see `booksInSpan`), newest first. */
@@ -49,13 +54,16 @@ export function summarize(books: Book[], span: DateSpan, today: IsoDate): Summar
     pagesPerDay: elapsed > 0 && withPages.length ? pages / elapsed : null,
     topCategory: topCounts(books.flatMap((b) => b.categories), 1)[0] ?? null,
     authors: new Set(books.flatMap((b) => b.authors.map((a) => a.toLowerCase()))).size,
-    longest: maxBy(withPages, (b) => b.pages!),
+    spentCents: priced(books).reduce((sum, b) => sum + b.priceCents!, 0),
+    pricedBooks: priced(books).length,
+    longest: allMaxBy(withPages, (b) => b.pages!),
     fastest: timed.length
-      ? timed.reduce((best, t) =>
-          t.days < best.days || (t.days === best.days && (t.book.pages ?? 0) > (best.book.pages ?? 0)) ? t : best,
-        )
+      ? {
+          books: allMaxBy(timed, (t) => -t.days).map((t) => t.book),
+          days: Math.min(...timed.map((t) => t.days)),
+        }
       : null,
-    favourite: maxBy(rated, (b) => b.rating!),
+    favourite: allMaxBy(rated, (b) => b.rating!),
   };
 }
 
@@ -83,15 +91,20 @@ export function countReadingDays(books: Book[], span: DateSpan): number {
   return total;
 }
 
+/** Books with a price that counts as money spent. */
+function priced(books: Book[]): Book[] {
+  return books.filter((b) => b.priceCents != null && isPriced(b.acquisition));
+}
+
 function average(values: number[]): number {
   return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
-/** First item with the highest score — books arrive newest first, so ties favour recent reads. */
-function maxBy<T>(items: T[], score: (item: T) => number): T | null {
-  let best: T | null = null;
-  for (const item of items) if (best == null || score(item) > score(best)) best = item;
-  return best;
+/** Every item sharing the highest score, in input order (books arrive newest first). */
+function allMaxBy<T>(items: T[], score: (item: T) => number): T[] {
+  if (items.length === 0) return [];
+  const best = Math.max(...items.map(score));
+  return items.filter((item) => score(item) === best);
 }
 
 function topCounts(names: string[], limit: number): { name: string; books: number }[] {
@@ -113,7 +126,11 @@ export type ChartKind =
   | "ratings"
   | "length-class"
   | "length"
-  | "reading-time";
+  | "reading-time"
+  | "format"
+  | "acquisition"
+  | "spending-over-time"
+  | "price";
 
 export const CHARTS: readonly { kind: ChartKind; label: string }[] = [
   { kind: "books-over-time", label: "Books finished over time" },
@@ -124,6 +141,10 @@ export const CHARTS: readonly { kind: ChartKind; label: string }[] = [
   { kind: "length-class", label: "Short, medium & long" },
   { kind: "length", label: "Page count" },
   { kind: "reading-time", label: "Time per book" },
+  { kind: "format", label: "Format" },
+  { kind: "acquisition", label: "How you got them" },
+  { kind: "spending-over-time", label: "Money spent over time" },
+  { kind: "price", label: "Price per book" },
 ];
 
 export type ChartStyle = "bar" | "line" | "pie";
@@ -145,6 +166,8 @@ export type ChartData = {
   slices?: Slice[];
   /** Caveat shown under the chart, e.g. how many books were left out. */
   note: string | null;
+  /** How values read: counts ("12") or money in euros ("12,99 €"). */
+  valueFormat?: "count" | "currency";
 };
 
 const BOOKS = { one: "book", many: "books" };
@@ -291,7 +314,78 @@ export function buildChart(kind: ChartKind, books: Book[], span: DateSpan, libra
         ),
       };
     }
+
+    case "format":
+      return optionChart(books, FORMATS, (b) => b.format, "format");
+
+    case "acquisition":
+      return optionChart(books, ACQUISITIONS, (b) => b.acquisition, "how you got it");
+
+    case "spending-over-time": {
+      const bought = priced(books);
+      const unpriced = books.filter((b) => isPriced(b.acquisition) && b.priceCents == null).length;
+      return {
+        layout: "columns",
+        bars: overTime(bought, span, (b) => b.priceCents! / 100),
+        unit: EUROS,
+        styles: ["bar", "line"],
+        valueFormat: "currency",
+        note: joinNotes(
+          "Bought books only — gifts and borrowed books cost nothing.",
+          unpriced ? `${plural(unpriced, BOOKS)} without a price not included.` : null,
+        ),
+      };
+    }
+
+    case "price": {
+      const buckets = [
+        { label: "<10 €", max: 999 },
+        { label: "10–15", max: 1499 },
+        { label: "15–20", max: 1999 },
+        { label: "20–25", max: 2499 },
+        { label: "25 €+", max: Infinity },
+      ];
+      const bars = histogram(priced(books).map((b) => b.priceCents!), buckets);
+      return {
+        layout: "columns",
+        bars,
+        unit: BOOKS,
+        styles: ["bar", "line", "pie"],
+        slices: orderedSlices(bars),
+        note: "Bought books with a price, grouped by what they cost (€).",
+      };
+    }
   }
+}
+
+const EUROS = { one: "€", many: "€" };
+
+/**
+ * A few fixed options (format, how you got it): one column each plus "Not set". Each option owns
+ * its pie colour by position, so colours never shift between ranges; "Not set" is grey.
+ */
+function optionChart<T extends string>(
+  books: Book[],
+  options: readonly { value: T; label: string }[],
+  get: (book: Book) => T | null,
+  what: string,
+): ChartData {
+  const bars: Bar[] = options.map((o) => ({ key: o.value, label: o.label, value: books.filter((b) => get(b) === o.value).length }));
+  const unset = books.filter((b) => get(b) == null).length;
+  if (unset > 0) bars.push({ key: "__unset", label: "Not set", value: unset });
+  const slices: Slice[] = bars.flatMap((bar, index) =>
+    bar.value > 0
+      ? [{ ...bar, color: bar.key === "__unset" ? { kind: "other" } : { kind: "categorical", index } } as Slice]
+      : [],
+  );
+  return {
+    layout: "columns",
+    bars,
+    unit: BOOKS,
+    styles: ["bar", "pie"],
+    slices,
+    note: unset ? `${plural(unset, BOOKS)} without a ${what} yet.` : null,
+  };
 }
 
 /** Ordered groups (short → long): spread the non-empty ones along the ordinal ramp by position. */

@@ -13,15 +13,21 @@ import { clearAllData, seedSampleBooks } from "@/db/seed";
 import { useBooks } from "@/hooks/use-books";
 import { spacing } from "@/theme/tokens";
 import type { Book } from "@/types";
+import { acquisitionLabel, formatLabel } from "@/utils/book-attributes";
 import { lengthClassLabel } from "@/utils/length-class";
 
 function matches(book: Book, query: string) {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  // Also matches the derived length class, so "short" or "long" finds books by size.
-  return [book.title, ...book.authors, ...book.categories, lengthClassLabel(book.pages) ?? ""].some(
-    (field) => field.toLowerCase().includes(q),
-  );
+  // Also matches length class, format and how you got it ("long", "e-book", "gift", …).
+  return [
+    book.title,
+    ...book.authors,
+    ...book.categories,
+    lengthClassLabel(book.pages) ?? "",
+    formatLabel(book.format) ?? "",
+    acquisitionLabel(book.acquisition) ?? "",
+  ].some((field) => field.toLowerCase().includes(q));
 }
 
 export default function LibraryScreen() {

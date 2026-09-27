@@ -1,11 +1,12 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useSQLiteContext } from "expo-sqlite";
-import { Alert, Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/app-text";
 import { BookCover } from "@/components/book-cover";
 import { Button } from "@/components/button";
 import { CategoryChips } from "@/components/category-chips";
+import { useConfirm } from "@/components/confirm-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { Screen } from "@/components/screen";
 import { StarRating } from "@/components/star-rating";
@@ -16,6 +17,7 @@ import { radii, spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
 import type { Book } from "@/types";
 import { formatDate, readingDays } from "@/utils/dates";
+import { acquisitionLabel, formatLabel, formatPrice } from "@/utils/book-attributes";
 import { lengthClassLabel } from "@/utils/length-class";
 
 export default function BookDetailScreen() {
@@ -44,20 +46,20 @@ function BookDetail({ book }: { book: Book }) {
   const db = useSQLiteContext();
   const { colors } = useTheme();
   const toast = useToast();
+  const confirm = useConfirm();
 
-  const confirmDelete = () =>
-    Alert.alert("Delete this book?", `“${book.title}” will be removed from your library.`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          await deleteBook(db, book.id);
-          router.back();
-          toast(`“${book.title}” was removed.`, "sleepy");
-        },
-      },
-    ]);
+  const confirmDelete = async () => {
+    const ok = await confirm({
+      title: "Delete this book?",
+      message: `“${book.title}” will be removed from your library.`,
+      confirmText: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
+    await deleteBook(db, book.id);
+    router.back();
+    toast(`“${book.title}” was removed.`, "sleepy");
+  };
 
   const facts: [label: string, value: string][] = [["Finished", formatDate(book.finishedAt)]];
   if (book.startedAt) {
@@ -66,6 +68,13 @@ function BookDetail({ book }: { book: Book }) {
   }
   if (book.pages) facts.push(["Length", `${lengthClassLabel(book.pages)} · ${book.pages} pages`]);
   if (book.isbn) facts.push(["ISBN", book.isbn]);
+
+  const copy: [label: string, value: string][] = [];
+  const format = formatLabel(book.format);
+  const acquisition = acquisitionLabel(book.acquisition);
+  if (format) copy.push(["Format", format]);
+  if (acquisition) copy.push(["How you got it", acquisition]);
+  if (book.priceCents != null) copy.push(["Price", formatPrice(book.priceCents)]);
 
   const card = { backgroundColor: colors.surface, borderColor: colors.border };
   const openEdit = () => router.push({ pathname: "/book/[id]/edit", params: { id: book.id } });
@@ -121,6 +130,20 @@ function BookDetail({ book }: { book: Book }) {
           <AppText>{book.comment}</AppText>
         </View>
       ) : null}
+
+      {copy.length > 0 && (
+        <View style={[styles.card, card]}>
+          <AppText variant="heading">Your copy</AppText>
+          {copy.map(([label, value]) => (
+            <View key={label} style={styles.fact}>
+              <AppText variant="label" color="muted">
+                {label}
+              </AppText>
+              <AppText variant="label">{value}</AppText>
+            </View>
+          ))}
+        </View>
+      )}
 
       <Button title="Delete book" variant="danger" onPress={confirmDelete} />
     </Screen>

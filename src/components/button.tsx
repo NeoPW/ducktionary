@@ -25,7 +25,8 @@ export function Button({ title, variant = "primary", disabled, ...rest }: Button
         styles.base,
         {
           backgroundColor: background,
-          borderColor: variant === "secondary" ? colors.border : "transparent",
+          borderColor:
+            variant === "secondary" ? colors.border : variant === "danger" ? colors.danger : "transparent",
           opacity: disabled ? 0.5 : pressed ? 0.85 : 1,
         },
       ]}

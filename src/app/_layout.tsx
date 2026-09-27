@@ -7,6 +7,7 @@ import { SQLiteProvider } from "expo-sqlite";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 
+import { ConfirmProvider } from "@/components/confirm-dialog";
 import { ToastProvider } from "@/components/toast";
 import { migrateDbIfNeeded } from "@/db/migrate";
 import { ThemeProvider, useTheme } from "@/theme/use-theme";
@@ -33,7 +34,9 @@ export default function RootLayout() {
     <ThemeProvider>
       <SQLiteProvider databaseName="ducktionary.db" onInit={migrateDbIfNeeded}>
         <ToastProvider>
-          <AppShell />
+          <ConfirmProvider>
+            <AppShell />
+          </ConfirmProvider>
         </ToastProvider>
       </SQLiteProvider>
     </ThemeProvider>

@@ -6,6 +6,7 @@ import { AppText } from "@/components/app-text";
 import { Button } from "@/components/button";
 import { ColorPickerSheet, type ContrastCheck } from "@/components/color/color-picker-sheet";
 import { SchemePreview } from "@/components/color/scheme-preview";
+import { useConfirm } from "@/components/confirm-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { TextField } from "@/components/form/text-field";
 import { Screen } from "@/components/screen";
@@ -14,7 +15,6 @@ import { BASE_FIELDS, resolveScheme, type BaseColors, type ThemeMode } from "@/t
 import { radii, spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
 import { contrast } from "@/utils/color";
-import { askToConfirm } from "@/utils/confirm";
 
 const MODES: readonly { value: ThemeMode; label: string }[] = [
   { value: "light", label: "Light" },
@@ -45,6 +45,7 @@ function checksFor(key: keyof BaseColors, base: BaseColors): ContrastCheck[] {
 export default function EditSchemeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const theme = useTheme();
+  const confirm = useConfirm();
   const scheme = theme.schemes.find((s) => s.id === id);
   const [mode, setMode] = useState<ThemeMode>(theme.isDark ? "dark" : "light");
   const [editing, setEditing] = useState<keyof BaseColors | null>(null);
@@ -67,7 +68,7 @@ export default function EditSchemeScreen() {
   const field = BASE_FIELDS.find((f) => f.key === editing);
 
   const remove = async () => {
-    const ok = await askToConfirm({
+    const ok = await confirm({
       title: "Delete this scheme?",
       message: `“${scheme.name}” will be removed.${active ? " The app switches back to Duck pond." : ""}`,
       confirmText: "Delete",
