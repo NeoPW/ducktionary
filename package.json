@@ -6,15 +6,18 @@
     "@expo-google-fonts/lora": "^0.4.2",
     "@expo-google-fonts/nunito": "^0.4.2",
     "@expo/ui": "~57.0.20",
+    "@supabase/supabase-js": "^2.117.2",
     "expo": "~57.0.25",
     "expo-camera": "~57.0.5",
     "expo-constants": "~57.0.19",
     "expo-device": "~57.0.2",
+    "expo-file-system": "~57.0.7",
     "expo-font": "~57.0.4",
     "expo-glass-effect": "~57.0.4",
     "expo-image": "~57.0.5",
     "expo-linking": "~57.0.11",
     "expo-router": "~57.0.23",
+    "expo-sharing": "~57.0.22",
     "expo-splash-screen": "~57.0.9",
     "expo-sqlite": "~57.0.3",
     "expo-status-bar": "~57.0.1",
@@ -37,6 +40,7 @@
     "@types/react": "~19.2.2",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.2",
+    "patch-package": "^8.0.1",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -49,7 +53,9 @@
     "mascots:icons": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/mascot-icons.ts && npm run mascots",
     "typecheck:scripts": "tsc -p scripts --noEmit",
     "mascots:sync": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/mascot-sync.ts",
-    "mascots:process": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/mascot-process.ts && npm run mascots"
+    "mascots:process": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/mascot-process.ts && npm run mascots",
+    "supabase:check": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/supabase-security-check.ts",
+    "postinstall": "patch-package"
   },
   "private": true
 }

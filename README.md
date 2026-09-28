@@ -12,6 +12,8 @@ npx expo start        # open in Expo Go on your phone
 
 Everything runs in Expo Go; no development build is needed.
 
+All optional settings are listed in `.env.example`.
+
 ### Google Books (optional)
 
 Book lookups use Open Library. To also search Google Books, create a key restricted to the Books API and put it in
@@ -21,12 +23,22 @@ Book lookups use Open Library. To also search Google Books, create a key restric
 EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY=your-key
 ```
 
+## Backups
+
+Everything is stored on the phone. Two ways to keep a copy:
+
+- **Cloud backup (optional):** with a Supabase project, signed-in users are backed up automatically and can
+  restore on a new phone. Setup, security model and an attack test: [`supabase/README.md`](supabase/README.md).
+  Without that config the feature is simply hidden.
+- **Backup file:** *Settings → Backup file → Export* saves one JSON file anywhere; *Import* restores it.
+
 ## Checks
 
 ```bash
 npx tsc --noEmit            # app types
 npm run typecheck:scripts   # Node scripts in scripts/
 npx expo lint
+npm run supabase:check      # attack-test the backup server (after setting it up)
 ```
 
 ## Mascots
@@ -49,4 +61,7 @@ Open `docs/mascot-gallery.html` in a browser to see every character, mood and go
 - `src/api/` — Open Library and Google Books lookups
 - `src/stats/` — stats and chart data
 - `src/theme/` — colour schemes and tokens
-- `scripts/` — mascot tooling (Node, run through the npm scripts above)
+- `src/sync/` — backups: snapshot format, Supabase client, backup file
+- `supabase/` — backup server schema and setup checklist
+- `patches/` — fixes for dependencies, applied on `npm install` (patch-package); remove each once upstream ships it
+- `scripts/` — mascot tooling and the backup server check (Node, run through the npm scripts above)

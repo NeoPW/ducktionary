@@ -28,3 +28,14 @@ export function readingDays(start: IsoDate, end: IsoDate): number {
   const ms = parseIsoDate(end).getTime() - parseIsoDate(start).getTime();
   return Math.round(ms / 86_400_000) + 1;
 }
+
+/** "just now", "5 minutes ago", "3 hours ago", "2 days ago", then a date. */
+export function timeAgo(iso: string, now = new Date()): string {
+  const seconds = Math.max(0, (now.getTime() - new Date(iso).getTime()) / 1000);
+  const plural = (n: number, unit: string) => `${n} ${unit}${n === 1 ? "" : "s"} ago`;
+  if (seconds < 60) return "just now";
+  if (seconds < 3600) return plural(Math.floor(seconds / 60), "minute");
+  if (seconds < 86_400) return plural(Math.floor(seconds / 3600), "hour");
+  if (seconds < 7 * 86_400) return plural(Math.floor(seconds / 86_400), "day");
+  return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}

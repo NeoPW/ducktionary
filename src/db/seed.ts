@@ -1,6 +1,7 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 
 import { insertBook } from "@/db/books";
+import { notifyLibraryChanged } from "@/db/events";
 import type { Acquisition, BookDraft, BookFormat, IsoDate } from "@/types";
 
 const cover = (isbn: string) => `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`;
@@ -87,4 +88,5 @@ export async function seedSampleBooks(db: SQLiteDatabase) {
 
 export async function clearAllData(db: SQLiteDatabase) {
   await db.execAsync("DELETE FROM book_categories; DELETE FROM books; DELETE FROM categories;");
+  notifyLibraryChanged();
 }

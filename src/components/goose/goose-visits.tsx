@@ -36,10 +36,17 @@ type GooseContextValue = {
   setEnabled: (enabled: boolean) => void;
   /** Bring the goose over right now. */
   summon: () => void;
+  /** Re-reads the saved setting (after a backup was restored). */
+  reloadFromStorage: () => void;
 };
 
 const STORAGE_KEY = "goose.enabled";
-const GooseContext = createContext<GooseContextValue>({ enabled: true, setEnabled: () => {}, summon: () => {} });
+const GooseContext = createContext<GooseContextValue>({
+  enabled: true,
+  setEnabled: () => {},
+  summon: () => {},
+  reloadFromStorage: () => {},
+});
 
 export function useGoose(): GooseContextValue {
   return use(GooseContext);
@@ -68,7 +75,9 @@ export function GooseProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <GooseContext value={{ enabled, setEnabled, summon: () => peek.current?.summon() }}>
+    <GooseContext
+      value={{ enabled, setEnabled, summon: () => peek.current?.summon(), reloadFromStorage: () => setEnabledState(loadEnabled()) }}
+    >
       {children}
       <GoosePeek enabled={enabled} ref={peek} />
     </GooseContext>

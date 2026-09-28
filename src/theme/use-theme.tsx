@@ -36,6 +36,8 @@ type ThemeContextValue = {
   renameScheme: (id: string, name: string) => void;
   setSchemeColor: (id: string, mode: ThemeMode, key: keyof BaseColors, value: string) => void;
   deleteScheme: (id: string) => void;
+  /** Re-reads the saved theme (after a backup was restored). */
+  reloadFromStorage: () => void;
 };
 
 const STORAGE_KEY = "theme.v1";
@@ -69,6 +71,7 @@ const ThemeContext = createContext<ThemeContextValue>({
   renameScheme: () => {},
   setSchemeColor: () => {},
   deleteScheme: () => {},
+  reloadFromStorage: () => {},
 });
 
 /** Current colours plus the theme settings. */
@@ -135,6 +138,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         custom: s.custom.filter((c) => c.id !== id),
         schemeId: s.schemeId === id ? DEFAULT_SCHEME_ID : s.schemeId,
       })),
+    reloadFromStorage: () => setState(loadTheme()),
   };
 
   return <ThemeContext value={value}>{children}</ThemeContext>;

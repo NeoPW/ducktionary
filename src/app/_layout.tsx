@@ -11,6 +11,7 @@ import { ConfirmProvider } from "@/components/confirm-dialog";
 import { GooseProvider } from "@/components/goose/goose-visits";
 import { ToastProvider } from "@/components/toast";
 import { migrateDbIfNeeded } from "@/db/migrate";
+import { BackupProvider } from "@/sync/backup-provider";
 import { ThemeProvider, useTheme } from "@/theme/use-theme";
 
 SplashScreen.preventAutoHideAsync();
@@ -59,15 +60,18 @@ function AppShell() {
       <StatusBar style={isDark ? "light" : "dark"} />
       {/* The goose occasionally pokes its head in over whatever screen is showing. */}
       <GooseProvider>
-        {/* Tabs live in (tabs); full-screen flows like the scanner and settings sit above them. */}
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen
-            name="scan"
-            options={{ presentation: "fullScreenModal", animation: "slide_from_bottom" }}
-          />
-          <Stack.Screen name="settings" />
-        </Stack>
+        {/* Signs in to Supabase (when configured) and keeps the cloud backup up to date. */}
+        <BackupProvider>
+          {/* Tabs live in (tabs); full-screen flows like the scanner and settings sit above them. */}
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen
+              name="scan"
+              options={{ presentation: "fullScreenModal", animation: "slide_from_bottom" }}
+            />
+            <Stack.Screen name="settings" />
+          </Stack>
+        </BackupProvider>
       </GooseProvider>
     </>
   );

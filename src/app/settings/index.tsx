@@ -6,6 +6,7 @@ import { Button } from "@/components/button";
 import { DuckMascot } from "@/components/duck-mascot";
 import { useGoose } from "@/components/goose/goose-visits";
 import { Screen } from "@/components/screen";
+import { BackupSection } from "@/components/settings/backup-section";
 import { SegmentedControl } from "@/components/segmented-control";
 import type { ColorScheme } from "@/theme/schemes";
 import { radii, spacing } from "@/theme/tokens";
@@ -76,6 +77,8 @@ export default function SettingsScreen() {
         </View>
         <Button title="Summon the goose" variant="secondary" onPress={goose.summon} />
       </View>
+
+      <BackupSection />
     </Screen>
   );
 }

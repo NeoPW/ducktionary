@@ -1,6 +1,7 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 
 import type { Acquisition, Book, BookDraft, BookFormat } from "@/types";
+import { notifyLibraryChanged } from "@/db/events";
 import { ACQUISITIONS, FORMATS, isPriced } from "@/utils/book-attributes";
 
 type BookRow = {
@@ -126,19 +127,28 @@ export async function getBook(db: SQLiteDatabase, id: number): Promise<Book | nu
 }
 
 export async function insertBook(db: SQLiteDatabase, draft: BookDraft): Promise<number> {
-  const params = toParams(draft);
   let id = 0;
   await db.withExclusiveTransactionAsync(async (txn) => {
-    const result = await txn.runAsync(
-      `INSERT INTO books (isbn, title, authors, pages, cover_url, started_at, finished_at, rating, comment,
-                          price_cents, format, acquisition)
-       VALUES ($isbn, $title, $authors, $pages, $cover_url, $started_at, $finished_at, $rating, $comment,
-               $price_cents, $format, $acquisition)`,
-      params,
-    );
-    id = result.lastInsertRowId;
-    await setCategories(txn, id, draft.categories);
+    id = await insertBookRow(txn, draft);
   });
+  notifyLibraryChanged();
+  return id;
+}
+
+/**
+ * Inserts one book inside a transaction the caller already holds (used by restore, which writes a
+ * whole library in one transaction). `createdAt` keeps the original "added" time when given.
+ */
+export async function insertBookRow(txn: SQLiteDatabase, draft: BookDraft, createdAt?: string): Promise<number> {
+  const result = await txn.runAsync(
+    `INSERT INTO books (isbn, title, authors, pages, cover_url, started_at, finished_at, rating, comment,
+                        price_cents, format, acquisition, created_at)
+     VALUES ($isbn, $title, $authors, $pages, $cover_url, $started_at, $finished_at, $rating, $comment,
+             $price_cents, $format, $acquisition, COALESCE($created_at, datetime('now')))`,
+    { ...toParams(draft), $created_at: createdAt ?? null },
+  );
+  const id = result.lastInsertRowId;
+  await setCategories(txn, id, draft.categories);
   return id;
 }
 
@@ -155,6 +165,7 @@ export async function updateBook(db: SQLiteDatabase, id: number, draft: BookDraf
     );
     await setCategories(txn, id, draft.categories);
   });
+  notifyLibraryChanged();
 }
 
 export async function deleteBook(db: SQLiteDatabase, id: number): Promise<void> {
@@ -162,6 +173,7 @@ export async function deleteBook(db: SQLiteDatabase, id: number): Promise<void> 
     await txn.runAsync("DELETE FROM books WHERE id = ?", id);
     await deleteUnusedCategories(txn);
   });
+  notifyLibraryChanged();
 }
 
 /** All category names in use, most used first — offered as suggestions in the book form. */
