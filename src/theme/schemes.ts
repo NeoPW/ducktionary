@@ -38,7 +38,7 @@ export const BASE_FIELDS: readonly { key: keyof BaseColors; label: string; hint:
   { key: "surface", label: "Cards", hint: "Cards, fields and the tab bar" },
   { key: "text", label: "Text", hint: "Titles and body text" },
   { key: "primary", label: "Main colour", hint: "Buttons, links and charts" },
-  { key: "accent", label: "Highlight", hint: "The duck, selections, frames" },
+  { key: "accent", label: "Highlight", hint: "Selections, frames and highlights" },
   { key: "secondary", label: "Secondary", hint: "Category chips" },
 ];
 

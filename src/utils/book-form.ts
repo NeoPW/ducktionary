@@ -65,7 +65,7 @@ export function formToDraft(
   }
 
   if (!form.finishedAt) errors.finishedAt = "When did you finish it?";
-  else if (form.finishedAt > today) errors.finishedAt = "That's in the future — no time-travelling ducks.";
+  else if (form.finishedAt > today) errors.finishedAt = "That's in the future — no time-travelling geese.";
 
   // Only bought books carry a price; for gifts and loans the field is hidden and ignored.
   const priceCents = isPriced(form.acquisition) ? parsePrice(form.price) : null;

@@ -8,6 +8,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 
 import { ConfirmProvider } from "@/components/confirm-dialog";
+import { GooseProvider } from "@/components/goose/goose-visits";
 import { ToastProvider } from "@/components/toast";
 import { migrateDbIfNeeded } from "@/db/migrate";
 import { ThemeProvider, useTheme } from "@/theme/use-theme";
@@ -56,15 +57,18 @@ function AppShell() {
   return (
     <>
       <StatusBar style={isDark ? "light" : "dark"} />
-      {/* Tabs live in (tabs); full-screen flows like the scanner and settings sit above them. */}
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen
-          name="scan"
-          options={{ presentation: "fullScreenModal", animation: "slide_from_bottom" }}
-        />
-        <Stack.Screen name="settings" />
-      </Stack>
+      {/* The goose occasionally pokes its head in over whatever screen is showing. */}
+      <GooseProvider>
+        {/* Tabs live in (tabs); full-screen flows like the scanner and settings sit above them. */}
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen
+            name="scan"
+            options={{ presentation: "fullScreenModal", animation: "slide_from_bottom" }}
+          />
+          <Stack.Screen name="settings" />
+        </Stack>
+      </GooseProvider>
     </>
   );
 }

@@ -51,7 +51,7 @@ export default function LibraryScreen() {
         <EmptyState
           mood="sleepy"
           title="No books yet"
-          message="Quack one in! Scan a barcode or search for a book you've finished."
+          message="Honk one in! Scan a barcode or search for a book you've finished."
           action={
             <>
               <Button title="Add a book" onPress={() => router.navigate("/add")} />

@@ -61,7 +61,7 @@ export default function ConfirmBookScreen() {
     return () => {
       router.dismissAll();
       router.navigate({ pathname: "/book/[id]", params: { id } });
-      toast(`Quack! “${draft.title}” is in your library.`);
+      toast(`Honk! “${draft.title}” is in your library.`);
     };
   };
 

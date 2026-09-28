@@ -33,6 +33,7 @@
     "react-native-worklets": "0.10.1"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@types/react": "~19.2.2",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.2",
@@ -43,7 +44,12 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "mascots": "npm run mascots:sync && node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/mascot-gallery.ts",
+    "mascots:icons": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/mascot-icons.ts && npm run mascots",
+    "typecheck:scripts": "tsc -p scripts --noEmit",
+    "mascots:sync": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/mascot-sync.ts",
+    "mascots:process": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/mascot-process.ts && npm run mascots"
   },
   "private": true
 }

@@ -1,56 +1,52 @@
-# Welcome to your Expo app 👋
+# Ducktionary
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A cozy book log for Android (and iOS), built with Expo. Scan a book's barcode or search for it, rate it, note
+what you thought, what it cost and how you got it — then browse your reading stats. A goose keeps you company.
 
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Run it
 
 ```bash
-npm run reset-project
+npm install
+npx expo start        # open in Expo Go on your phone
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Everything runs in Expo Go; no development build is needed.
 
-### Other setup steps
+### Google Books (optional)
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+Book lookups use Open Library. To also search Google Books, create a key restricted to the Books API and put it in
+`.env.local` (git-ignored), then restart with `npx expo start --clear`:
 
-## Learn more
+```
+EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY=your-key
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+## Checks
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```bash
+npx tsc --noEmit            # app types
+npm run typecheck:scripts   # Node scripts in scripts/
+npx expo lint
+```
 
-## Join the community
+## Mascots
 
-Join our community of developers creating universal apps.
+The mascots (a goose and a few ducklings) are drawn in code in `src/components/mascot/shapes.ts` and are being
+replaced by drawn images — **work in progress**, see `docs/mascot-art-brief.md` for the prompts and status.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```bash
+npm run mascots:process   # raw images in docs/mascot-art/raw/ → app-ready images in assets/mascots/
+npm run mascots           # check the images, register them for the app, build docs/mascot-gallery.html
+npm run mascots:icons     # rebuild the app icons from the goose
+```
+
+Open `docs/mascot-gallery.html` in a browser to see every character, mood and goose visit.
+
+## Where things are
+
+- `src/app/` — screens (Expo Router): library, add/scan, stats, settings
+- `src/db/` — on-device SQLite (books, migrations, sample data)
+- `src/api/` — Open Library and Google Books lookups
+- `src/stats/` — stats and chart data
+- `src/theme/` — colour schemes and tokens
+- `scripts/` — mascot tooling (Node, run through the npm scripts above)

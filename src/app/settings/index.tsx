@@ -1,8 +1,10 @@
 import { router } from "expo-router";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, Switch, View } from "react-native";
 
 import { AppText } from "@/components/app-text";
 import { Button } from "@/components/button";
+import { DuckMascot } from "@/components/duck-mascot";
+import { useGoose } from "@/components/goose/goose-visits";
 import { Screen } from "@/components/screen";
 import { SegmentedControl } from "@/components/segmented-control";
 import type { ColorScheme } from "@/theme/schemes";
@@ -16,7 +18,8 @@ const MODES: readonly { value: ThemePreference; label: string }[] = [
 ];
 
 export default function SettingsScreen() {
-  const { preference, setPreference, schemes, activeSchemeId, selectScheme, duplicateScheme } = useTheme();
+  const { colors, preference, setPreference, schemes, activeSchemeId, selectScheme, duplicateScheme } = useTheme();
+  const goose = useGoose();
 
   const customise = (id: string) => {
     const copyId = duplicateScheme(id);
@@ -51,6 +54,27 @@ export default function SettingsScreen() {
         <AppText variant="caption" color="muted">
           Built-in schemes stay as they are — “Customise” makes your own copy to edit.
         </AppText>
+      </View>
+
+      <View style={styles.section}>
+        <AppText variant="heading">Goose</AppText>
+        <View style={[styles.gooseCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <DuckMascot species="goose" mood="confused" size={64} />
+          <View style={styles.flex}>
+            <AppText variant="label">Surprise goose visits</AppText>
+            <AppText variant="caption" color="muted">
+              Every few minutes a goose may poke its head in. Poke it back and it runs.
+            </AppText>
+          </View>
+          <Switch
+            value={goose.enabled}
+            onValueChange={goose.setEnabled}
+            accessibilityLabel="Surprise goose visits"
+            trackColor={{ true: colors.primary, false: colors.border }}
+            thumbColor={colors.surface}
+          />
+        </View>
+        <Button title="Summon the goose" variant="secondary" onPress={goose.summon} />
       </View>
     </Screen>
   );
@@ -115,6 +139,14 @@ function SchemeRow({
 
 const styles = StyleSheet.create({
   section: { gap: spacing.md },
+  gooseCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radii.card,
+    borderWidth: 1,
+  },
   flex: { flex: 1 },
   row: {
     flexDirection: "row",

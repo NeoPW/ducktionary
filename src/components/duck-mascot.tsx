@@ -1,68 +1,163 @@
-import Svg, { Circle, Ellipse, Path, Rect, Text as SvgText } from "react-native-svg";
+import { Image } from "expo-image";
+import { useId, useState, type ReactNode } from "react";
+import Svg, {
+  Circle,
+  ClipPath,
+  Defs,
+  Ellipse,
+  G,
+  LinearGradient,
+  Path,
+  RadialGradient,
+  Rect,
+  Stop,
+  Text as SvgText,
+} from "react-native-svg";
 
+import { MASCOT_IMAGES } from "@/components/mascot/images.generated";
+import {
+  mascotShapes,
+  MOODS,
+  randomSpecies,
+  SPECIES,
+  type GradientStop,
+  type Mood,
+  type Shape,
+  type Species,
+} from "@/components/mascot/shapes";
+import { fonts } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
 
-export type DuckMood = "reading" | "sleepy" | "celebrating" | "confused" | "scanning";
+export type DuckMood = Mood;
 
 type DuckMascotProps = {
   mood?: DuckMood;
   size?: number;
+  /** Leave unset for a random bird (picked once per appearance). */
+  species?: Species;
 };
 
-/** Placeholder vector duck. Swap the drawing for illustrated art later; the props stay the same. */
-export function DuckMascot({ mood = "reading", size = 120 }: DuckMascotProps) {
+/** Characters with every mood drawn — once any exist, random picks stay among them. */
+const FULLY_DRAWN = SPECIES.map((s) => s.value).filter((value) => MOODS.every((m) => MASCOT_IMAGES[value]?.[m]));
+
+/**
+ * The app's mascot: a random goose or duckling acting out a mood. Uses the drawn image from
+ * assets/mascots/ when there is one, otherwise the vector drawing.
+ */
+export function DuckMascot({ mood = "reading", size = 120, species }: DuckMascotProps) {
   const { colors } = useTheme();
-  // The duck is the same duck in every colour scheme — only its book and props follow the theme.
-  const ink = "#2B2622";
-  const body = "#F4C542";
-  const wing = "#E3AE2A";
-  const bill = "#E8833A";
+  const [randomPick] = useState(() => randomSpecies(Math.random, FULLY_DRAWN));
+  const idPrefix = useSvgIdPrefix();
+  const bird = species ?? randomPick;
+  const label = SPECIES.find((s) => s.value === bird)?.label ?? "duck";
+  const drawn = MASCOT_IMAGES[bird]?.[mood];
+
+  if (drawn) {
+    return (
+      <Image
+        source={drawn}
+        style={{ width: size, height: size }}
+        contentFit="contain"
+        transition={0}
+        accessibilityLabel={`Cute ${label}, ${mood}`}
+      />
+    );
+  }
 
   return (
-    <Svg width={size} height={size} viewBox="0 0 120 120" accessibilityLabel={`Duck mascot, ${mood}`}>
-      {/* tail + body */}
-      <Path d="M96 70 L114 58 L106 80 Z" fill={body} />
-      <Ellipse cx={64} cy={82} rx={42} ry={27} fill={body} />
-      <Path d="M58 76 Q76 66 92 80 Q78 94 60 88 Z" fill={wing} />
-
-      {/* head + bill */}
-      <Circle cx={42} cy={46} r={23} fill={body} />
-      <Path d="M22 47 Q6 44 4 51 Q9 58 25 55 Z" fill={bill} />
-
-      {/* eye */}
-      {mood === "sleepy" ? (
-        <Path d="M31 42 Q36 46 41 42" stroke={ink} strokeWidth={2.5} fill="none" strokeLinecap="round" />
-      ) : (
-        <>
-          <Circle cx={36} cy={41} r={mood === "scanning" ? 5 : 4} fill={ink} />
-          <Circle cx={37.5} cy={39.5} r={1.4} fill="#FFFFFF" />
-        </>
-      )}
-
-      {mood === "reading" && (
-        <>
-          <Rect x={14} y={70} width={30} height={22} rx={2} fill={colors.secondary} />
-          <Path d="M29 70 L29 92" stroke="#FFFFFF" strokeWidth={1.5} />
-        </>
-      )}
-      {mood === "sleepy" && (
-        <SvgText x={66} y={30} fontSize={18} fontWeight="bold" fill={colors.muted}>
-          z z
-        </SvgText>
-      )}
-      {mood === "confused" && (
-        <SvgText x={64} y={32} fontSize={26} fontWeight="bold" fill={colors.primary}>
-          ?
-        </SvgText>
-      )}
-      {mood === "celebrating" && (
-        <>
-          <Circle cx={74} cy={18} r={3} fill={colors.primary} />
-          <Circle cx={90} cy={30} r={2.5} fill={colors.secondary} />
-          <Rect x={80} y={10} width={5} height={5} fill={colors.star} rotation={30} origin="82, 12" />
-          <Circle cx={16} cy={20} r={2.5} fill={colors.secondary} />
-        </>
-      )}
+    <Svg width={size} height={size} viewBox="0 0 120 120" accessibilityLabel={`Cute ${label}, ${mood}`}>
+      <Shapes shapes={mascotShapes(bird, mood, colors, idPrefix)} />
     </Svg>
   );
+}
+
+/** A per-instance prefix for gradient/clip ids (SVG ids can't contain React's ":" characters). */
+export function useSvgIdPrefix(): string {
+  return `s${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
+}
+
+/** Renders a mascot shape list with react-native-svg: definitions first, then the drawing. */
+export function Shapes({ shapes }: { shapes: Shape[] }) {
+  const defs: ReactNode[] = [];
+  const drawing = shapes.map((shape, i) => renderShape(shape, `${i}`, defs));
+  return (
+    <>
+      <Defs>{defs}</Defs>
+      {drawing}
+    </>
+  );
+}
+
+function renderStops(stops: GradientStop[]) {
+  return stops.map((s, i) => <Stop key={i} offset={s.offset} stopColor={s.color} stopOpacity={s.opacity ?? 1} />);
+}
+
+function renderShape(s: Shape, key: string, defs: ReactNode[]): ReactNode {
+  switch (s.kind) {
+    case "linearGradient":
+      defs.push(
+        <LinearGradient key={s.id} id={s.id} x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2}>
+          {renderStops(s.stops)}
+        </LinearGradient>,
+      );
+      return null;
+    case "radialGradient":
+      defs.push(
+        <RadialGradient key={s.id} id={s.id} cx={s.cx} cy={s.cy} r={s.r} fx={s.fx ?? s.cx} fy={s.fy ?? s.cy}>
+          {renderStops(s.stops)}
+        </RadialGradient>,
+      );
+      return null;
+    case "clipPath":
+      defs.push(
+        <ClipPath key={s.id} id={s.id}>
+          {s.children.map((child, i) => renderShape(child, `${key}.${i}`, defs))}
+        </ClipPath>,
+      );
+      return null;
+    case "group":
+      return (
+        <G
+          key={key}
+          transform={s.transform}
+          opacity={s.opacity}
+          clipPath={s.clipPath ? `url(#${s.clipPath})` : undefined}
+        >
+          {s.children.map((child, i) => renderShape(child, `${key}.${i}`, defs))}
+        </G>
+      );
+  }
+
+  const paint = {
+    fill: s.fill ?? "none",
+    stroke: s.stroke,
+    strokeWidth: s.strokeWidth,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    opacity: s.opacity,
+    transform: s.transform,
+  };
+  switch (s.kind) {
+    case "path":
+      return <Path key={key} d={s.d} {...paint} />;
+    case "circle":
+      return <Circle key={key} cx={s.cx} cy={s.cy} r={s.r} {...paint} />;
+    case "ellipse":
+      return <Ellipse key={key} cx={s.cx} cy={s.cy} rx={s.rx} ry={s.ry} {...paint} />;
+    case "rect":
+      return <Rect key={key} x={s.x} y={s.y} width={s.width} height={s.height} rx={s.rx} {...paint} />;
+    case "text":
+      return (
+        <SvgText
+          key={key}
+          x={s.x}
+          y={s.y}
+          fontSize={s.size}
+          fontFamily={s.weight === "bold" ? fonts.sansBold : fonts.sans}
+          {...paint}
+        >
+          {s.text}
+        </SvgText>
+      );
+  }
 }

@@ -45,7 +45,7 @@ export default function ScanScreen() {
       <Screen contentStyle={styles.centered}>
         <EmptyState
           mood="scanning"
-          title="Let the duck see"
+          title="Let the goose see"
           message="Ducktionary needs the camera to read the barcode on the back of your book. Photos are never taken or stored."
           action={
             <>
