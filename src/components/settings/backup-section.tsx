@@ -3,20 +3,20 @@ import { StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/app-text";
 import { Button } from "@/components/button";
+import { Card } from "@/components/card";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useToast } from "@/components/toast";
-import { friendlyError, useBackup } from "@/sync/backup-provider";
-import { radii, spacing } from "@/theme/tokens";
-import { useTheme } from "@/theme/use-theme";
+import { restoredMessage, useBackup } from "@/sync/backup-provider";
+import { friendlyError, KEPT_BACKUPS } from "@/sync/cloud";
+import { spacing } from "@/theme/tokens";
 import { timeAgo } from "@/utils/dates";
+import { BOOKS, plural } from "@/utils/format";
 
 /** Settings → "Account & backup" (only when this build has a backup server) and "Backup file". */
 export function BackupSection() {
   const backup = useBackup();
-  const { colors } = useTheme();
   const confirm = useConfirm();
   const toast = useToast();
-  const card = { backgroundColor: colors.surface, borderColor: colors.border };
 
   const backUpNow = async () => {
     try {
@@ -24,7 +24,7 @@ export function BackupSection() {
       if (result.kind === "shrunk") {
         const ok = await confirm({
           title: "Back up the smaller library?",
-          message: `This phone has ${result.books} books, your last backup has ${result.backedUp}. The older backups stay available for 30 more backups.`,
+          message: `This phone has ${result.books} books, your last backup has ${result.backedUp}. The older backups stay available for ${KEPT_BACKUPS} more backups.`,
           confirmText: "Back up anyway",
         });
         if (!ok) return;
@@ -48,7 +48,7 @@ export function BackupSection() {
   const exportFile = async () => {
     try {
       const books = await backup.exportFile();
-      toast(`Backup file with ${books} ${books === 1 ? "book" : "books"} is ready.`, "celebrating");
+      toast(`Backup file with ${plural(books, BOOKS)} is ready.`, "celebrating");
     } catch (error) {
       toast(friendlyError(error), "confused");
     }
@@ -60,13 +60,13 @@ export function BackupSection() {
       if (!snapshot) return;
       const ok = await confirm({
         title: "This backup file is valid",
-        message: `It has ${snapshot.books.length} ${snapshot.books.length === 1 ? "book" : "books"} and was saved on ${new Date(snapshot.createdAt).toLocaleDateString()}. Restoring replaces the library on this phone with it.`,
+        message: `It has ${plural(snapshot.books.length, BOOKS)} and was saved on ${new Date(snapshot.createdAt).toLocaleDateString()}. Restoring replaces the library on this phone with it.`,
         confirmText: "Restore",
         destructive: true,
       });
       if (!ok) return;
       const n = await backup.restoreFromFile(snapshot);
-      toast(`Honk! ${n} books restored.`);
+      toast(restoredMessage(n));
     } catch (error) {
       toast(friendlyError(error), "confused");
     }
@@ -77,7 +77,7 @@ export function BackupSection() {
       {backup.configured && (
         <View style={styles.section}>
           <AppText variant="heading">Account & backup</AppText>
-          <View style={[styles.card, card]}>
+          <Card style={styles.card}>
             {backup.email ? (
               <>
                 <AppText variant="label">Signed in as {backup.email}</AppText>
@@ -100,7 +100,7 @@ export function BackupSection() {
                 <Button title="Sign in" onPress={() => router.push("/settings/account")} />
               </>
             )}
-          </View>
+          </Card>
         </View>
       )}
 
@@ -125,7 +125,7 @@ export function BackupSection() {
 
 const styles = StyleSheet.create({
   section: { gap: spacing.md },
-  card: { padding: spacing.lg, borderRadius: radii.card, borderWidth: 1, gap: spacing.sm },
+  card: { padding: spacing.lg, gap: spacing.sm },
   buttons: { gap: spacing.sm, marginTop: spacing.sm },
   row: { flexDirection: "row", gap: spacing.md },
   flex: { flex: 1 },

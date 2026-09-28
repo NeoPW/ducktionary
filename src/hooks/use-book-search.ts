@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { searchBooks } from "@/api/book-lookup";
 import type { SearchResult } from "@/api/search-result";
+import { toError } from "@/utils/errors";
 import { normalizeIsbn } from "@/utils/isbn";
 
 const DEBOUNCE_MS = 450;
@@ -31,11 +32,7 @@ export function useBookSearch(query: string) {
         (results) => setCompleted({ query: trimmed, attempt, results }),
         (error: unknown) => {
           if (controller.signal.aborted) return;
-          setCompleted({
-            query: trimmed,
-            attempt,
-            error: error instanceof Error ? error : new Error(String(error)),
-          });
+          setCompleted({ query: trimmed, attempt, error: toError(error) });
         },
       );
     }, DEBOUNCE_MS);

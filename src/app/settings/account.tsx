@@ -8,8 +8,12 @@ import { DuckMascot } from "@/components/duck-mascot";
 import { TextField } from "@/components/form/text-field";
 import { Screen } from "@/components/screen";
 import { useToast } from "@/components/toast";
-import { friendlyError, useBackup } from "@/sync/backup-provider";
+import { useBackup } from "@/sync/backup-provider";
+import { friendlyError } from "@/sync/cloud";
 import { spacing } from "@/theme/tokens";
+
+/** Every password field: hidden, and no auto-capitalisation or autocorrect changing what was typed. */
+const PASSWORD_INPUT = { secureTextEntry: true, autoCapitalize: "none", autoCorrect: false } as const;
 
 /** Sign in (signed out) or change the password (signed in). */
 export default function AccountScreen() {
@@ -57,9 +61,7 @@ function SignIn() {
         label="Password"
         value={password}
         onChangeText={setPassword}
-        secureTextEntry
-        autoCapitalize="none"
-        autoCorrect={false}
+        {...PASSWORD_INPUT}
         autoComplete="current-password"
         textContentType="password"
         onSubmitEditing={submit}
@@ -104,9 +106,7 @@ function ChangePassword() {
         label="New password"
         value={password}
         onChangeText={setPassword}
-        secureTextEntry
-        autoCapitalize="none"
-        autoCorrect={false}
+        {...PASSWORD_INPUT}
         autoComplete="new-password"
         textContentType="newPassword"
       />
@@ -114,9 +114,7 @@ function ChangePassword() {
         label="Repeat new password"
         value={repeat}
         onChangeText={setRepeat}
-        secureTextEntry
-        autoCapitalize="none"
-        autoCorrect={false}
+        {...PASSWORD_INPUT}
         autoComplete="new-password"
         textContentType="newPassword"
         onSubmitEditing={submit}

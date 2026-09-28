@@ -1,40 +1,18 @@
-import { router, useLocalSearchParams } from "expo-router";
+import { router } from "expo-router";
 import { useSQLiteContext } from "expo-sqlite";
-import { useCallback, useState } from "react";
-import { StyleSheet } from "react-native";
+import { useState } from "react";
 
 import { BookForm } from "@/components/book-form";
 import { useConfirm } from "@/components/confirm-dialog";
-import { Button } from "@/components/button";
-import { EmptyState } from "@/components/empty-state";
-import { Screen } from "@/components/screen";
+import { RouteBook } from "@/components/route-book";
 import { useToast } from "@/components/toast";
-import { hasIsbn, listCategories, updateBook } from "@/db/books";
-import { useBook } from "@/hooks/use-books";
-import { useFocusLoader } from "@/hooks/use-focus-loader";
+import { hasIsbn, updateBook } from "@/db/books";
+import { useCategories } from "@/hooks/use-books";
 import type { Book, BookDraft } from "@/types";
-import { bookToDraft } from "@/utils/book-form";
+import { bookToDraft } from "@/utils/book-draft";
 
 export default function EditBookScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const book = useBook(Number(id));
-
-  if (book.status === "loading") return <Screen>{null}</Screen>;
-
-  if (book.status === "error" || book.data == null) {
-    return (
-      <Screen contentStyle={styles.centered}>
-        <EmptyState
-          mood="confused"
-          title="Book not found"
-          message={book.status === "error" ? book.error.message : "It may have been deleted."}
-          action={<Button title="Back" onPress={() => router.back()} />}
-        />
-      </Screen>
-    );
-  }
-
-  return <EditForm book={book.data} />;
+  return <RouteBook>{(book) => <EditForm book={book} />}</RouteBook>;
 }
 
 function EditForm({ book }: { book: Book }) {
@@ -43,8 +21,7 @@ function EditForm({ book }: { book: Book }) {
   const confirm = useConfirm();
   // Captured once so refetches on focus don't reset what the user is typing.
   const [initial] = useState(() => bookToDraft(book));
-  const loadCategories = useCallback(() => listCategories(db), [db]);
-  const categories = useFocusLoader(loadCategories);
+  const categories = useCategories();
 
   const save = async (draft: BookDraft) => {
     if (draft.isbn && draft.isbn !== book.isbn && (await hasIsbn(db, draft.isbn))) {
@@ -71,7 +48,3 @@ function EditForm({ book }: { book: Book }) {
     />
   );
 }
-
-const styles = StyleSheet.create({
-  centered: { flexGrow: 1, justifyContent: "center" },
-});

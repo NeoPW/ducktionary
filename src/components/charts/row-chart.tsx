@@ -1,7 +1,7 @@
 import { StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/app-text";
-import type { Bar } from "@/stats/compute";
+import type { Bar } from "@/stats/charts";
 import { spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
 

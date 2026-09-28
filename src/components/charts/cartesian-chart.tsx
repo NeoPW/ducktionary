@@ -3,11 +3,11 @@ import { Pressable, StyleSheet, View } from "react-native";
 import Svg, { Circle, Line, Path, Text as SvgText } from "react-native-svg";
 
 import { AppText } from "@/components/app-text";
-import type { Bar } from "@/stats/compute";
+import type { Bar } from "@/stats/charts";
 import { niceTicks } from "@/stats/ticks";
 import { fonts, spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
-import { formatCount } from "@/utils/format";
+import { formatCount, type Unit } from "@/utils/format";
 
 const PLOT_HEIGHT = 150;
 const TOP_PAD = 20; // room for the value label above the tallest bar
@@ -19,7 +19,7 @@ const MIN_LABEL_SPACING = 42;
 type CartesianChartProps = {
   bars: Bar[];
   variant: "bar" | "line";
-  unit: { one: string; many: string };
+  unit: Unit;
   accessibilityLabel: string;
   /** Compact value for ticks and the peak label (default: 4.4k). */
   formatShort?: (value: number) => string;

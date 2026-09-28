@@ -13,10 +13,12 @@ import { SearchField } from "@/components/search-field";
 import { SegmentedControl } from "@/components/segmented-control";
 import { useBookSearch } from "@/hooks/use-book-search";
 import { usePreference } from "@/hooks/use-preference";
+import { SETTING_KEYS } from "@/storage/keys";
 import { radii, spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
 import type { BookDraft } from "@/types";
-import { blankDraft } from "@/utils/book-form";
+import { blankDraft } from "@/utils/book-draft";
+import { confirmBookHref } from "@/utils/confirm-route";
 import { todayIso } from "@/utils/dates";
 import { formatCount } from "@/utils/format";
 import { normalizeIsbn } from "@/utils/isbn";
@@ -28,7 +30,7 @@ const SORTS: readonly { value: SearchSort; label: string }[] = [
 ];
 
 function openConfirm(draft: BookDraft) {
-  router.push({ pathname: "/add/confirm", params: { draft: JSON.stringify(draft) } });
+  router.push(confirmBookHref(draft));
 }
 
 export default function AddScreen() {
@@ -36,7 +38,7 @@ export default function AddScreen() {
   const [query, setQuery] = useState("");
   const search = useBookSearch(query);
   const [sort, setSort] = usePreference<SearchSort>(
-    "add.searchSort",
+    SETTING_KEYS.searchSort,
     SORTS.map((s) => s.value),
     "relevance",
   );

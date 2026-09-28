@@ -2,15 +2,17 @@ import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/app-text";
+import { Card } from "@/components/card";
 import { CartesianChart } from "@/components/charts/cartesian-chart";
 import { PieChart } from "@/components/charts/pie-chart";
 import { RowChart } from "@/components/charts/row-chart";
 import { Dropdown } from "@/components/dropdown";
 import { SegmentedControl } from "@/components/segmented-control";
 import { usePreference } from "@/hooks/use-preference";
-import { buildChart, CHARTS, type ChartKind, type ChartStyle } from "@/stats/compute";
+import { buildChart, CHARTS, type ChartKind, type ChartStyle } from "@/stats/charts";
 import type { DateSpan } from "@/stats/range";
-import { radii, spacing } from "@/theme/tokens";
+import { SETTING_KEYS } from "@/storage/keys";
+import { spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
 import type { Book } from "@/types";
 import { formatPrice } from "@/utils/book-attributes";
@@ -31,11 +33,11 @@ type ChartSectionProps = {
 export function ChartSection({ books, span, library }: ChartSectionProps) {
   const { colors } = useTheme();
   const [kind, setKind] = usePreference<ChartKind>(
-    "stats.chart",
+    SETTING_KEYS.statsChart,
     CHARTS.map((c) => c.kind),
     "books-over-time",
   );
-  const [preferredStyle, setPreferredStyle] = usePreference<ChartStyle>("stats.chartStyle", ALL_STYLES, "bar");
+  const [preferredStyle, setPreferredStyle] = usePreference<ChartStyle>(SETTING_KEYS.statsChartStyle, ALL_STYLES, "bar");
   const [showTable, setShowTable] = useState(false);
 
   const chart = buildChart(kind, books, span, library);
@@ -66,7 +68,7 @@ export function ChartSection({ books, span, library }: ChartSectionProps) {
           onChange={setPreferredStyle}
         />
       )}
-      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <Card style={styles.card}>
         {empty ? (
           <AppText color="muted" style={styles.empty}>
             Nothing to chart for this period.
@@ -111,14 +113,14 @@ export function ChartSection({ books, span, library }: ChartSectionProps) {
             {note}
           </AppText>
         ) : null}
-      </View>
+      </Card>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   section: { gap: spacing.sm },
-  card: { padding: spacing.lg, borderRadius: radii.card, borderWidth: 1, gap: spacing.md },
+  card: { padding: spacing.lg, gap: spacing.md },
   empty: { textAlign: "center", paddingVertical: spacing.xl },
   table: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: spacing.sm, gap: spacing.xs },
   tableRow: { flexDirection: "row", justifyContent: "space-between" },

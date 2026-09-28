@@ -1,8 +1,8 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 
-import type { Acquisition, Book, BookDraft, BookFormat } from "@/types";
 import { notifyLibraryChanged } from "@/db/events";
-import { ACQUISITIONS, FORMATS, isPriced } from "@/utils/book-attributes";
+import type { Book, BookDraft } from "@/types";
+import { isAcquisition, isFormat, isPriced } from "@/utils/book-attributes";
 
 type BookRow = {
   id: number;
@@ -44,8 +44,8 @@ function toBook(row: BookRow): Book {
     comment: row.comment,
     categories: (JSON.parse(row.categories) as string[]).sort((a, b) => a.localeCompare(b)),
     priceCents: row.price_cents,
-    format: FORMATS.some((f) => f.value === row.format) ? (row.format as BookFormat) : null,
-    acquisition: ACQUISITIONS.some((a) => a.value === row.acquisition) ? (row.acquisition as Acquisition) : null,
+    format: isFormat(row.format) ? row.format : null,
+    acquisition: isAcquisition(row.acquisition) ? row.acquisition : null,
     createdAt: row.created_at,
   };
 }
@@ -174,6 +174,11 @@ export async function deleteBook(db: SQLiteDatabase, id: number): Promise<void> 
     await deleteUnusedCategories(txn);
   });
   notifyLibraryChanged();
+}
+
+/** Empties the library (books and their categories) inside a transaction the caller holds. */
+export async function deleteAllBooks(txn: SQLiteDatabase): Promise<void> {
+  await txn.execAsync("DELETE FROM book_categories; DELETE FROM books; DELETE FROM categories;");
 }
 
 /** All category names in use, most used first — offered as suggestions in the book form. */

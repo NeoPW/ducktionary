@@ -6,22 +6,15 @@
  */
 import type { SQLiteDatabase } from "expo-sqlite";
 
-import { insertBookRow, listBooks } from "@/db/books";
+import { deleteAllBooks, insertBookRow, listBooks } from "@/db/books";
 import { notifyLibraryChanged } from "@/db/events";
-import type { Acquisition, Book, BookDraft, BookFormat } from "@/types";
+import { BACKUP_SETTING_KEYS, type SettingKey } from "@/storage/keys";
+import type { Book, BookDraft } from "@/types";
+import { isAcquisition, isFormat } from "@/utils/book-attributes";
 
 /** Bump when the snapshot shape changes; older formats must keep restoring. */
 export const SNAPSHOT_FORMAT = 1;
 
-/** Settings that travel with a backup (the rest is device-specific). */
-export const BACKUP_SETTING_KEYS = [
-  "theme.v1",
-  "goose.enabled",
-  "stats.range",
-  "stats.chart",
-  "stats.chartStyle",
-  "add.searchSort",
-] as const;
 
 export type SnapshotBook = Omit<Book, "id">;
 
@@ -33,7 +26,7 @@ export type Snapshot = {
   appVersion: string;
   createdAt: string;
   books: SnapshotBook[];
-  settings: Partial<Record<(typeof BACKUP_SETTING_KEYS)[number], string>>;
+  settings: Partial<Record<SettingKey, string>>;
 };
 
 export type SettingsStore = {
@@ -68,8 +61,6 @@ export async function buildSnapshot(
 // ─── Validation ─────────────────────────────────────────────────────────────
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-const FORMATS: readonly BookFormat[] = ["hardcover", "paperback", "ebook"];
-const ACQUISITIONS: readonly Acquisition[] = ["bought", "gift", "borrowed"];
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const text = (v: unknown, max: number): v is string => typeof v === "string" && v.length <= max;
@@ -97,8 +88,8 @@ function checkBook(b: unknown, index: number): SnapshotBook {
   if (!numberOrNull(b.pages, 1, 100_000)) throw new SnapshotError(`${where} has an invalid page count.`);
   if (!numberOrNull(b.rating, 0.5, 5)) throw new SnapshotError(`${where} has an invalid rating.`);
   if (!numberOrNull(b.priceCents, 0, 100_000_000)) throw new SnapshotError(`${where} has an invalid price.`);
-  if (!(b.format === null || FORMATS.includes(b.format as BookFormat))) throw new SnapshotError(`${where} has an unknown format.`);
-  if (!(b.acquisition === null || ACQUISITIONS.includes(b.acquisition as Acquisition))) {
+  if (!(b.format === null || isFormat(b.format))) throw new SnapshotError(`${where} has an unknown format.`);
+  if (!(b.acquisition === null || isAcquisition(b.acquisition))) {
     throw new SnapshotError(`${where} has an unknown "how you got it".`);
   }
   if (!text(b.createdAt, 40)) throw new SnapshotError(`${where} has no creation time.`);
@@ -114,8 +105,8 @@ function checkBook(b: unknown, index: number): SnapshotBook {
     pages: b.pages as number | null,
     rating: b.rating as number | null,
     priceCents: b.priceCents as number | null,
-    format: b.format as BookFormat | null,
-    acquisition: b.acquisition as Acquisition | null,
+    format: b.format,
+    acquisition: b.acquisition,
     createdAt: b.createdAt,
   };
 }
@@ -154,7 +145,7 @@ export function validateSnapshot(input: unknown): Snapshot {
  */
 export async function restoreSnapshot(db: SQLiteDatabase, snapshot: Snapshot, settings: SettingsStore): Promise<number> {
   await db.withExclusiveTransactionAsync(async (txn) => {
-    await txn.execAsync("DELETE FROM book_categories; DELETE FROM books; DELETE FROM categories;");
+    await deleteAllBooks(txn);
     // Oldest first, so row ids keep the original order.
     for (const { createdAt, ...book } of [...snapshot.books].reverse()) {
       const draft: BookDraft = book;

@@ -1,5 +1,5 @@
 import { coverUrlForIsbn } from "@/api/open-library";
-import type { Acquisition, Book, BookDraft, BookFormat, IsoDate } from "@/types";
+import type { Acquisition, BookDraft, BookFormat, IsoDate } from "@/types";
 import { formatPrice, isPriced, parsePrice } from "@/utils/book-attributes";
 import { normalizeIsbn } from "@/utils/isbn";
 
@@ -99,29 +99,4 @@ export function formToDraft(
       acquisition: form.acquisition,
     },
   };
-}
-
-/** An empty draft for manual entry, optionally prefilled from what the user searched for. */
-export function blankDraft(today: IsoDate, prefill: Partial<BookDraft> = {}): BookDraft {
-  return {
-    isbn: null,
-    title: "",
-    authors: [],
-    pages: null,
-    coverUrl: null,
-    startedAt: null,
-    finishedAt: today,
-    rating: null,
-    comment: null,
-    categories: [],
-    priceCents: null,
-    format: null,
-    acquisition: null,
-    ...prefill,
-  };
-}
-
-/** The editable part of a saved book. */
-export function bookToDraft({ id: _id, createdAt: _createdAt, ...draft }: Book): BookDraft {
-  return draft;
 }

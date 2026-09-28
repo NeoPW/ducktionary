@@ -9,13 +9,14 @@ import { findByIsbn } from "@/api/book-lookup";
 import { AppText } from "@/components/app-text";
 import { Button } from "@/components/button";
 import { DuckMascot } from "@/components/duck-mascot";
-import { EmptyState } from "@/components/empty-state";
-import { Screen } from "@/components/screen";
+import { EmptyScreen } from "@/components/empty-state";
 import { radii, spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
 import type { BookDraft } from "@/types";
-import { blankDraft } from "@/utils/book-form";
+import { blankDraft } from "@/utils/book-draft";
+import { confirmBookHref } from "@/utils/confirm-route";
 import { todayIso } from "@/utils/dates";
+import { toError } from "@/utils/errors";
 import { normalizeIsbn } from "@/utils/isbn";
 
 type Phase =
@@ -29,10 +30,7 @@ const INVALID_HINT_MS = 2500;
 /** Leaves the scanner and opens the confirm form in the Add tab. */
 function continueWith(draft: BookDraft, notFound = false) {
   router.dismiss();
-  router.navigate({
-    pathname: "/add/confirm",
-    params: { draft: JSON.stringify(draft), ...(notFound ? { notFound: "1" } : {}) },
-  });
+  router.navigate(confirmBookHref(draft, { notFound }));
 }
 
 export default function ScanScreen() {
@@ -42,23 +40,21 @@ export default function ScanScreen() {
 
   if (!permission.granted) {
     return (
-      <Screen contentStyle={styles.centered}>
-        <EmptyState
-          mood="scanning"
-          title="Let the goose see"
-          message="Ducktionary needs the camera to read the barcode on the back of your book. Photos are never taken or stored."
-          action={
-            <>
-              {permission.canAskAgain ? (
-                <Button title="Allow camera" onPress={requestPermission} />
-              ) : (
-                <Button title="Open settings" onPress={() => Linking.openSettings()} />
-              )}
-              <Button title="Not now" variant="ghost" onPress={() => router.dismiss()} />
-            </>
-          }
-        />
-      </Screen>
+      <EmptyScreen
+        mood="scanning"
+        title="Let the goose see"
+        message="Ducktionary needs the camera to read the barcode on the back of your book. Photos are never taken or stored."
+        action={
+          <>
+            {permission.canAskAgain ? (
+              <Button title="Allow camera" onPress={requestPermission} />
+            ) : (
+              <Button title="Open settings" onPress={() => Linking.openSettings()} />
+            )}
+            <Button title="Not now" variant="ghost" onPress={() => router.dismiss()} />
+          </>
+        }
+      />
     );
   }
 
@@ -87,11 +83,7 @@ function Scanner() {
       if (found) continueWith(found.draft);
       else continueWith(blankDraft(todayIso(), { isbn }), true);
     } catch (error) {
-      setPhase({
-        kind: "error",
-        isbn,
-        message: error instanceof Error ? error.message : String(error),
-      });
+      setPhase({ kind: "error", isbn, message: toError(error).message });
     }
   };
 
@@ -217,7 +209,6 @@ function RoundButton({
 
 const styles = StyleSheet.create({
   black: { flex: 1, backgroundColor: "#000000" },
-  centered: { flexGrow: 1, justifyContent: "center" },
   overlay: { justifyContent: "space-between" },
   topBar: {
     flexDirection: "row",

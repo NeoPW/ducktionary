@@ -47,6 +47,11 @@ export function Screen({ children, scroll = true, contentStyle }: ScreenProps) {
   );
 }
 
+/** Blank screen while its data loads (loads are local and quick, so no spinner). */
+export function LoadingScreen() {
+  return <Screen>{null}</Screen>;
+}
+
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   content: { padding: spacing.lg, gap: spacing.lg },

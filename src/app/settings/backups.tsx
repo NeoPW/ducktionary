@@ -3,16 +3,18 @@ import { FlatList, Pressable, StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/app-text";
 import { useConfirm } from "@/components/confirm-dialog";
-import { EmptyState } from "@/components/empty-state";
-import { Screen, useBottomInset } from "@/components/screen";
+import { EmptyScreen } from "@/components/empty-state";
+import { LoadingScreen, Screen, useBottomInset } from "@/components/screen";
 import { useToast } from "@/components/toast";
 import { useFocusLoader } from "@/hooks/use-focus-loader";
-import { friendlyError, listCloudBackups, useBackup, type BackupInfo } from "@/sync/backup-provider";
+import { restoredMessage, useBackup } from "@/sync/backup-provider";
+import { friendlyError, KEPT_BACKUPS, listCloudBackups, type BackupInfo } from "@/sync/cloud";
 import { radii, spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
 import { timeAgo } from "@/utils/dates";
+import { BOOKS, plural } from "@/utils/format";
 
-/** The last 30 cloud backups; pick one to replace the library with it. */
+/** The kept cloud backups; pick one to replace the library with it. */
 export default function BackupsScreen() {
   const backup = useBackup();
   const { colors } = useTheme();
@@ -31,26 +33,22 @@ export default function BackupsScreen() {
     if (!ok) return;
     try {
       const n = await backup.restoreBackup(item.id);
-      toast(`Honk! ${n} books restored.`);
+      toast(restoredMessage(n));
       router.back();
     } catch (error) {
       toast(friendlyError(error), "confused");
     }
   };
 
-  if (backups.status === "loading") return <Screen>{null}</Screen>;
+  if (backups.status === "loading") return <LoadingScreen />;
   if (backups.status === "error") {
     return (
-      <Screen contentStyle={styles.centered}>
-        <EmptyState mood="confused" title="Couldn't load your backups" message={friendlyError(backups.error)} />
-      </Screen>
+      <EmptyScreen mood="confused" title="Couldn't load your backups" message={friendlyError(backups.error)} />
     );
   }
   if (backups.data.length === 0) {
     return (
-      <Screen contentStyle={styles.centered}>
-        <EmptyState mood="sleepy" title="No backups yet" message="Your first backup happens automatically a minute after you change your library." />
-      </Screen>
+      <EmptyScreen mood="sleepy" title="No backups yet" message="Your first backup happens automatically a minute after you change your library." />
     );
   }
 
@@ -63,7 +61,7 @@ export default function BackupsScreen() {
         contentContainerStyle={[styles.list, { paddingBottom: spacing.lg + bottomInset }]}
         ListHeaderComponent={
           <AppText variant="caption" color="muted">
-            The newest 30 backups are kept. Restoring replaces the books on this phone.
+            The newest {KEPT_BACKUPS} backups are kept. Restoring replaces the books on this phone.
           </AppText>
         }
         renderItem={({ item, index }) => (
@@ -85,7 +83,7 @@ export default function BackupsScreen() {
               </AppText>
             </View>
             <AppText variant="label" color="muted">
-              {item.bookCount} {item.bookCount === 1 ? "book" : "books"}
+              {plural(item.bookCount, BOOKS)}
             </AppText>
           </Pressable>
         )}
@@ -95,7 +93,6 @@ export default function BackupsScreen() {
 }
 
 const styles = StyleSheet.create({
-  centered: { flexGrow: 1, justifyContent: "center" },
   list: { padding: spacing.lg, gap: spacing.sm },
   row: {
     flexDirection: "row",

@@ -1,31 +1,20 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useSQLiteContext } from "expo-sqlite";
-import { useCallback, useEffect, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { useEffect, useState } from "react";
+import { StyleSheet } from "react-native";
 
 import { AppText } from "@/components/app-text";
 import { BookForm } from "@/components/book-form";
+import { Card } from "@/components/card";
 import { useConfirm } from "@/components/confirm-dialog";
 import { DuckMascot } from "@/components/duck-mascot";
 import { useToast } from "@/components/toast";
-import { hasIsbn, insertBook, listCategories } from "@/db/books";
-import { useFocusLoader } from "@/hooks/use-focus-loader";
-import { radii, spacing } from "@/theme/tokens";
+import { hasIsbn, insertBook } from "@/db/books";
+import { useCategories } from "@/hooks/use-books";
+import { spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
 import type { BookDraft } from "@/types";
-import { blankDraft } from "@/utils/book-form";
-import { todayIso } from "@/utils/dates";
-
-function parseDraft(param: string | undefined): BookDraft {
-  if (param) {
-    try {
-      return { ...blankDraft(todayIso()), ...(JSON.parse(param) as Partial<BookDraft>) };
-    } catch {
-      // Fall through to an empty form.
-    }
-  }
-  return blankDraft(todayIso());
-}
+import { parseDraftParam } from "@/utils/confirm-route";
 
 export default function ConfirmBookScreen() {
   const db = useSQLiteContext();
@@ -33,11 +22,10 @@ export default function ConfirmBookScreen() {
   const toast = useToast();
   const confirm = useConfirm();
   const { draft: draftParam, notFound } = useLocalSearchParams<{ draft?: string; notFound?: string }>();
-  const [initial] = useState(() => parseDraft(draftParam));
+  const [initial] = useState(() => parseDraftParam(draftParam));
   const [duplicate, setDuplicate] = useState(false);
 
-  const loadCategories = useCallback(() => listCategories(db), [db]);
-  const categories = useFocusLoader(loadCategories);
+  const categories = useCategories();
 
   useEffect(() => {
     if (!initial.isbn) return;
@@ -73,14 +61,14 @@ export default function ConfirmBookScreen() {
       categorySuggestions={categories.data ?? []}
       notice={
         duplicate || notFound ? (
-          <View style={[styles.notice, { backgroundColor: colors.surface, borderColor: colors.accent }]}>
+          <Card style={[styles.notice, { borderColor: colors.accent }]}>
             <DuckMascot mood="confused" size={48} />
             <AppText variant="label" style={styles.noticeText}>
               {duplicate
                 ? "You've already logged this book. Saving will add it a second time."
                 : `Open Library doesn't know ISBN ${initial.isbn ?? ""} yet. Fill in the details yourself.`}
             </AppText>
-          </View>
+          </Card>
         ) : null
       }
     />
@@ -93,8 +81,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.md,
     padding: spacing.md,
-    borderRadius: radii.card,
-    borderWidth: 1,
   },
   noticeText: { flex: 1 },
 });

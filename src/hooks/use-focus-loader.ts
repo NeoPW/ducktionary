@@ -1,6 +1,8 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 
+import { toError } from "@/utils/errors";
+
 type LoaderState<T> =
   | { status: "loading"; data?: undefined; error?: undefined }
   | { status: "ready"; data: T; error?: undefined }
@@ -13,27 +15,30 @@ type LoaderState<T> =
 export function useFocusLoader<T>(load: () => Promise<T>) {
   const [state, setState] = useState<LoaderState<T>>({ status: "loading" });
 
+  /** Loads and stores the result, unless `isActive` says the screen has moved on meanwhile. */
+  const run = useCallback(
+    async (isActive: () => boolean = () => true) => {
+      try {
+        const data = await load();
+        if (isActive()) setState({ status: "ready", data });
+      } catch (error) {
+        if (isActive()) setState({ status: "error", error: toError(error) });
+      }
+    },
+    [load],
+  );
+
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      load().then(
-        (data) => active && setState({ status: "ready", data }),
-        (error: unknown) =>
-          active && setState({ status: "error", error: error instanceof Error ? error : new Error(String(error)) }),
-      );
+      run(() => active);
       return () => {
         active = false;
       };
-    }, [load]),
+    }, [run]),
   );
 
-  const reload = useCallback(async () => {
-    try {
-      setState({ status: "ready", data: await load() });
-    } catch (error) {
-      setState({ status: "error", error: error instanceof Error ? error : new Error(String(error)) });
-    }
-  }, [load]);
+  const reload = useCallback(() => run(), [run]);
 
   return { ...state, reload };
 }

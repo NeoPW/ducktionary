@@ -61,7 +61,8 @@ Open `docs/mascot-gallery.html` in a browser to see every character, mood and go
 - `src/api/` — Open Library and Google Books lookups
 - `src/stats/` — stats and chart data
 - `src/theme/` — colour schemes and tokens
-- `src/sync/` — backups: snapshot format, Supabase client, backup file
+- `src/storage/` — on-device settings (kv-store) and the list of setting keys
+- `src/sync/` — backups: snapshot format, Supabase access, backup files, the backup provider
 - `supabase/` — backup server schema and setup checklist
 - `patches/` — fixes for dependencies, applied on `npm install` (patch-package); remove each once upstream ships it
 - `scripts/` — mascot tooling and the backup server check (Node, run through the npm scripts above)

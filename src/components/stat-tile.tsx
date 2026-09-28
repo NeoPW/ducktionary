@@ -1,8 +1,8 @@
-import { StyleSheet, View } from "react-native";
+import { StyleSheet } from "react-native";
 
 import { AppText } from "@/components/app-text";
-import { fonts, radii, spacing } from "@/theme/tokens";
-import { useTheme } from "@/theme/use-theme";
+import { Card } from "@/components/card";
+import { fonts, spacing } from "@/theme/tokens";
 
 type StatTileProps = {
   label: string;
@@ -12,10 +12,9 @@ type StatTileProps = {
 
 /** One figure: label, value (sans, never serif), optional context line. */
 export function StatTile({ label, value, detail }: StatTileProps) {
-  const { colors } = useTheme();
   return (
-    <View
-      style={[styles.tile, { backgroundColor: colors.surface, borderColor: colors.border }]}
+    <Card
+      style={styles.tile}
       accessible
       accessibilityLabel={`${label}: ${value}${detail ? `, ${detail}` : ""}`}
     >
@@ -30,7 +29,7 @@ export function StatTile({ label, value, detail }: StatTileProps) {
           {detail}
         </AppText>
       ) : null}
-    </View>
+    </Card>
   );
 }
 
@@ -39,8 +38,6 @@ const styles = StyleSheet.create({
     flexBasis: "47%",
     flexGrow: 1,
     padding: spacing.md,
-    borderRadius: radii.card,
-    borderWidth: 1,
     gap: 2,
   },
   value: { fontFamily: fonts.sansBold, fontSize: 22, lineHeight: 28 },

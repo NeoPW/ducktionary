@@ -6,8 +6,8 @@ import { KeyboardAvoidingView, ScrollView, StyleSheet, View } from "react-native
 import { AppText } from "@/components/app-text";
 import { BookCover } from "@/components/book-cover";
 import { Button } from "@/components/button";
-import { ChipInput } from "@/components/form/chip-input";
 import { useConfirm } from "@/components/confirm-dialog";
+import { ChipInput } from "@/components/form/chip-input";
 import { ChoiceChips } from "@/components/form/choice-chips";
 import { DateField } from "@/components/form/date-field";
 import { RatingField } from "@/components/form/rating-field";
@@ -15,9 +15,10 @@ import { TextField } from "@/components/form/text-field";
 import { spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
 import type { BookDraft } from "@/types";
-import { draftToForm, formToDraft, type BookFormErrors, type BookFormState } from "@/utils/book-form";
 import { ACQUISITIONS, FORMATS, isPriced } from "@/utils/book-attributes";
+import { draftToForm, formToDraft, type BookFormErrors, type BookFormState } from "@/utils/book-form";
 import { todayIso } from "@/utils/dates";
+import { toError } from "@/utils/errors";
 
 type BookFormProps = {
   initial: BookDraft;
@@ -79,7 +80,7 @@ export function BookForm({ initial, submitLabel, onSubmit, categorySuggestions, 
       const next = await onSubmit(result.draft);
       if (next) setLeave(() => next);
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : String(error));
+      setSaveError(toError(error).message);
     } finally {
       setSaving(false);
     }

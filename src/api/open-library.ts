@@ -1,6 +1,7 @@
 import { deviceLanguage, fetchJson } from "@/api/http";
 import { cleanSubjects, type SearchResult } from "@/api/search-result";
 import type { BookDraft, BookFormat } from "@/types";
+import { blankDraft } from "@/utils/book-draft";
 import { todayIso } from "@/utils/dates";
 import { normalizeIsbn } from "@/utils/isbn";
 
@@ -87,21 +88,14 @@ function toResult(doc: WorkDoc, knownIsbn: string | null): SearchResult {
       doc.ratings_count && doc.ratings_average
         ? { average: doc.ratings_average, count: doc.ratings_count }
         : null,
-    draft: {
+    draft: blankDraft(todayIso(), {
       isbn,
       title: edition?.title ?? doc.title,
       authors: doc.author_name ?? [],
       pages: edition?.number_of_pages ?? doc.number_of_pages_median ?? null,
       coverUrl: coverId ? coverUrlForId(coverId) : isbn ? coverUrlForIsbn(isbn) : null,
-      startedAt: null,
-      finishedAt: todayIso(),
-      rating: null,
-      comment: null,
       categories: cleanSubjects(doc.subject ?? []),
-      priceCents: null,
-      format: null,
-      acquisition: null,
-    },
+    }),
   };
 }
 
@@ -145,21 +139,15 @@ export async function lookupOpenLibraryEdition(isbn: string, signal?: AbortSigna
 
   const coverId = edition.covers?.find((id) => id > 0);
 
-  return {
+  return blankDraft(todayIso(), {
     isbn,
     title: edition.title,
     authors: authors.flatMap((a) => (a?.name ? [a.name] : [])),
     pages: edition.number_of_pages ?? null,
     coverUrl: coverId ? coverUrlForId(coverId) : coverUrlForIsbn(isbn),
-    startedAt: null,
-    finishedAt: todayIso(),
-    rating: null,
-    comment: null,
     categories: cleanSubjects(edition.subjects ?? work?.subjects ?? []),
-    priceCents: null,
     format: formatFromPhysical(edition.physical_format),
-    acquisition: null,
-  };
+  });
 }
 
 /** Maps Open Library's free-text physical format onto ours, or null when it's unclear. */

@@ -4,10 +4,12 @@ import { FlatList, Pressable, StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/app-text";
 import { BookCover } from "@/components/book-cover";
-import type { Summary } from "@/stats/compute";
-import { radii, spacing } from "@/theme/tokens";
+import { Card } from "@/components/card";
+import type { Summary } from "@/stats/summary";
+import { spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
 import type { Book } from "@/types";
+import { DAYS, plural } from "@/utils/format";
 
 type Highlight = { label: string; books: Book[]; value: (book: Book) => string };
 
@@ -20,7 +22,7 @@ export function Highlights({ summary }: { summary: Summary }) {
   }
   if (summary.fastest) {
     const { days } = summary.fastest;
-    rows.push({ label: "Fastest read", books: summary.fastest.books, value: () => `${days} ${days === 1 ? "day" : "days"}` });
+    rows.push({ label: "Fastest read", books: summary.fastest.books, value: () => plural(days, DAYS) });
   }
   if (summary.favourite.length > 0) {
     rows.push({ label: "Favourite", books: summary.favourite, value: (b) => `${b.rating} ★` });
@@ -30,7 +32,7 @@ export function Highlights({ summary }: { summary: Summary }) {
   return (
     <View style={styles.section}>
       <AppText variant="heading">Highlights</AppText>
-      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <Card style={styles.card}>
         {rows.map((row, i) => (
           <View
             key={row.label}
@@ -40,7 +42,7 @@ export function Highlights({ summary }: { summary: Summary }) {
             <HighlightRow key={row.books.map((b) => b.id).join(",")} highlight={row} />
           </View>
         ))}
-      </View>
+      </Card>
     </View>
   );
 }
@@ -109,7 +111,7 @@ function HighlightRow({ highlight }: { highlight: Highlight }) {
 
 const styles = StyleSheet.create({
   section: { gap: spacing.sm },
-  card: { borderRadius: radii.card, borderWidth: 1, overflow: "hidden" },
+  card: { overflow: "hidden" },
   page: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md },
   text: { flex: 1, gap: 2 },
   dots: {

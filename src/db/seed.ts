@@ -1,10 +1,9 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 
-import { insertBook } from "@/db/books";
+import { coverUrlForIsbn } from "@/api/open-library";
+import { deleteAllBooks, insertBookRow } from "@/db/books";
 import { notifyLibraryChanged } from "@/db/events";
 import type { Acquisition, BookDraft, BookFormat, IsoDate } from "@/types";
-
-const cover = (isbn: string) => `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`;
 
 function sample(
   isbn: string,
@@ -24,7 +23,7 @@ function sample(
     title,
     authors,
     pages,
-    coverUrl: cover(isbn),
+    coverUrl: coverUrlForIsbn(isbn),
     startedAt,
     finishedAt,
     rating,
@@ -81,12 +80,13 @@ const SAMPLE_BOOKS: BookDraft[] = [
 
 /** Dev-only helpers to populate or wipe the library while building screens. */
 export async function seedSampleBooks(db: SQLiteDatabase) {
-  for (const book of SAMPLE_BOOKS) {
-    await insertBook(db, book);
-  }
+  await db.withExclusiveTransactionAsync(async (txn) => {
+    for (const book of SAMPLE_BOOKS) await insertBookRow(txn, book);
+  });
+  notifyLibraryChanged();
 }
 
 export async function clearAllData(db: SQLiteDatabase) {
-  await db.execAsync("DELETE FROM book_categories; DELETE FROM books; DELETE FROM categories;");
+  await db.withExclusiveTransactionAsync(deleteAllBooks);
   notifyLibraryChanged();
 }

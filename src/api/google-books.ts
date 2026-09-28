@@ -1,6 +1,7 @@
 import { fetchJson } from "@/api/http";
 import { cleanSubjects, type SearchResult } from "@/api/search-result";
 import type { BookDraft } from "@/types";
+import { blankDraft } from "@/utils/book-draft";
 import { todayIso } from "@/utils/dates";
 import { normalizeIsbn } from "@/utils/isbn";
 
@@ -77,21 +78,14 @@ function toResult(volume: Volume, knownIsbn: string | null): SearchResult | null
       info.averageRating && info.ratingsCount
         ? { average: info.averageRating, count: info.ratingsCount }
         : null,
-    draft: {
+    draft: blankDraft(todayIso(), {
       isbn,
       title: info.title,
       authors: info.authors ?? [],
       pages: info.pageCount && info.pageCount > 0 ? info.pageCount : null,
       // Google hands out http:// links with a page-curl effect; ask for the plain https image.
       coverUrl: image ? image.replace(/^http:/, "https:").replace("&edge=curl", "") : null,
-      startedAt: null,
-      finishedAt: todayIso(),
-      rating: null,
-      comment: null,
       categories: cleanSubjects(info.categories ?? []),
-      priceCents: null,
-      format: null,
-      acquisition: null,
-    },
+    }),
   };
 }

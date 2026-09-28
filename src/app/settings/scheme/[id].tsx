@@ -7,7 +7,7 @@ import { Button } from "@/components/button";
 import { ColorPickerSheet, type ContrastCheck } from "@/components/color/color-picker-sheet";
 import { SchemePreview } from "@/components/color/scheme-preview";
 import { useConfirm } from "@/components/confirm-dialog";
-import { EmptyState } from "@/components/empty-state";
+import { EmptyScreen } from "@/components/empty-state";
 import { TextField } from "@/components/form/text-field";
 import { Screen } from "@/components/screen";
 import { SegmentedControl } from "@/components/segmented-control";
@@ -52,14 +52,12 @@ export default function EditSchemeScreen() {
 
   if (!scheme || scheme.builtIn) {
     return (
-      <Screen contentStyle={styles.centered}>
-        <EmptyState
-          mood="confused"
-          title="Can't edit this scheme"
-          message={scheme ? "Built-in schemes stay as they are. Customise one to get your own copy." : "It may have been deleted."}
-          action={<Button title="Back" onPress={() => router.back()} />}
-        />
-      </Screen>
+      <EmptyScreen
+        mood="confused"
+        title="Can't edit this scheme"
+        message={scheme ? "Built-in schemes stay as they are. Customise one to get your own copy." : "It may have been deleted."}
+        action={<Button title="Back" onPress={() => router.back()} />}
+      />
     );
   }
 
@@ -150,7 +148,6 @@ export default function EditSchemeScreen() {
 }
 
 const styles = StyleSheet.create({
-  centered: { flexGrow: 1, justifyContent: "center" },
   section: { gap: spacing.sm },
   flex: { flex: 1, gap: 2 },
   list: { borderRadius: radii.card, borderWidth: 1, overflow: "hidden" },

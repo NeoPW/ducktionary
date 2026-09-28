@@ -1,5 +1,4 @@
 import { usePathname } from "expo-router";
-import Storage from "expo-sqlite/kv-store";
 import {
   createContext,
   use,
@@ -28,6 +27,8 @@ import { Shapes, useSvgIdPrefix } from "@/components/duck-mascot";
 import { PEEK_POSES, peekPoseFor } from "@/components/mascot/art";
 import { PEEK_IMAGES } from "@/components/mascot/images.generated";
 import { GOOSE_PEEK_SIZE, goosePeekShapes, type GoosePose } from "@/components/mascot/shapes";
+import { SETTING_KEYS } from "@/storage/keys";
+import { readSetting, writeSetting } from "@/storage/settings";
 import { fonts } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
 
@@ -40,7 +41,6 @@ type GooseContextValue = {
   reloadFromStorage: () => void;
 };
 
-const STORAGE_KEY = "goose.enabled";
 const GooseContext = createContext<GooseContextValue>({
   enabled: true,
   setEnabled: () => {},
@@ -53,11 +53,7 @@ export function useGoose(): GooseContextValue {
 }
 
 function loadEnabled(): boolean {
-  try {
-    return Storage.getItemSync(STORAGE_KEY) !== "false";
-  } catch {
-    return true;
-  }
+  return readSetting(SETTING_KEYS.gooseEnabled) !== "false";
 }
 
 /** Provides the goose settings and renders the goose that now and then pokes its head in. */
@@ -67,11 +63,7 @@ export function GooseProvider({ children }: { children: ReactNode }) {
 
   const setEnabled = (value: boolean) => {
     setEnabledState(value);
-    try {
-      Storage.setItemSync(STORAGE_KEY, String(value));
-    } catch {
-      // Not critical.
-    }
+    writeSetting(SETTING_KEYS.gooseEnabled, String(value));
   };
 
   return (

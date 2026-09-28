@@ -3,11 +3,12 @@ import { Pressable, StyleSheet, Switch, View } from "react-native";
 
 import { AppText } from "@/components/app-text";
 import { Button } from "@/components/button";
+import { Card } from "@/components/card";
 import { DuckMascot } from "@/components/duck-mascot";
 import { useGoose } from "@/components/goose/goose-visits";
 import { Screen } from "@/components/screen";
-import { BackupSection } from "@/components/settings/backup-section";
 import { SegmentedControl } from "@/components/segmented-control";
+import { BackupSection } from "@/components/settings/backup-section";
 import type { ColorScheme } from "@/theme/schemes";
 import { radii, spacing } from "@/theme/tokens";
 import { useTheme, type ThemePreference } from "@/theme/use-theme";
@@ -59,7 +60,7 @@ export default function SettingsScreen() {
 
       <View style={styles.section}>
         <AppText variant="heading">Goose</AppText>
-        <View style={[styles.gooseCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Card style={styles.gooseCard}>
           <DuckMascot species="goose" mood="confused" size={64} />
           <View style={styles.flex}>
             <AppText variant="label">Surprise goose visits</AppText>
@@ -74,7 +75,7 @@ export default function SettingsScreen() {
             trackColor={{ true: colors.primary, false: colors.border }}
             thumbColor={colors.surface}
           />
-        </View>
+        </Card>
         <Button title="Summon the goose" variant="secondary" onPress={goose.summon} />
       </View>
 
@@ -147,8 +148,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.md,
     padding: spacing.md,
-    borderRadius: radii.card,
-    borderWidth: 1,
   },
   flex: { flex: 1 },
   row: {

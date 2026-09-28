@@ -3,6 +3,7 @@ import { StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/app-text";
 import { DuckMascot, type DuckMood } from "@/components/duck-mascot";
+import { Screen } from "@/components/screen";
 import { spacing } from "@/theme/tokens";
 
 type EmptyStateProps = {
@@ -29,7 +30,17 @@ export function EmptyState({ mood, title, message, action }: EmptyStateProps) {
   );
 }
 
+/** A whole screen showing just an empty state, centred — for "nothing here", errors and not-found. */
+export function EmptyScreen(props: EmptyStateProps) {
+  return (
+    <Screen contentStyle={styles.screen}>
+      <EmptyState {...props} />
+    </Screen>
+  );
+}
+
 const styles = StyleSheet.create({
+  screen: { flexGrow: 1, justifyContent: "center" },
   container: {
     alignItems: "center",
     justifyContent: "center",

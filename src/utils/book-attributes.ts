@@ -12,6 +12,14 @@ export const ACQUISITIONS: readonly { value: Acquisition; label: string }[] = [
   { value: "borrowed", label: "Borrowed" },
 ];
 
+export function isFormat(value: unknown): value is BookFormat {
+  return FORMATS.some((f) => f.value === value);
+}
+
+export function isAcquisition(value: unknown): value is Acquisition {
+  return ACQUISITIONS.some((a) => a.value === value);
+}
+
 export function formatLabel(format: BookFormat | null): string | null {
   return FORMATS.find((f) => f.value === format)?.label ?? null;
 }

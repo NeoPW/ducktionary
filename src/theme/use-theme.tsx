@@ -1,6 +1,8 @@
-import Storage from "expo-sqlite/kv-store";
 import { createContext, use, useEffect, useState, type ReactNode } from "react";
 import { Appearance, useColorScheme } from "react-native";
+
+import { SETTING_KEYS } from "@/storage/keys";
+import { readSetting, writeSetting } from "@/storage/settings";
 
 import {
   DEFAULT_SCHEME_ID,
@@ -40,13 +42,12 @@ type ThemeContextValue = {
   reloadFromStorage: () => void;
 };
 
-const STORAGE_KEY = "theme.v1";
 const DEFAULTS: StoredTheme = { preference: "system", schemeId: DEFAULT_SCHEME_ID, custom: [] };
 
 function loadTheme(): StoredTheme {
+  const raw = readSetting(SETTING_KEYS.theme);
+  if (!raw) return DEFAULTS;
   try {
-    const raw = Storage.getItemSync(STORAGE_KEY);
-    if (!raw) return DEFAULTS;
     const parsed = JSON.parse(raw) as Partial<StoredTheme>;
     return {
       preference: parsed.preference === "light" || parsed.preference === "dark" ? parsed.preference : "system",
@@ -88,11 +89,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<StoredTheme>(loadTheme);
 
   useEffect(() => {
-    try {
-      Storage.setItemSync(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-      // Not critical — the theme just won't be remembered.
-    }
+    writeSetting(SETTING_KEYS.theme, JSON.stringify(state));
   }, [state]);
 
   // Tell the OS, so system dialogs, date pickers and keyboards follow a forced light/dark choice.

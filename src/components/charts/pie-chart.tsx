@@ -2,10 +2,10 @@ import { StyleSheet, View } from "react-native";
 import Svg, { Circle, Path, Text as SvgText } from "react-native-svg";
 
 import { AppText } from "@/components/app-text";
-import type { Slice, SliceColor } from "@/stats/compute";
+import type { Slice, SliceColor } from "@/stats/charts";
 import { fonts, spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
-import { formatCount } from "@/utils/format";
+import { formatCount, type Unit } from "@/utils/format";
 
 const SIZE = 180;
 const OUTER = SIZE / 2;
@@ -14,7 +14,7 @@ const GAP = 2; // surface-coloured spacer between slices
 
 type PieChartProps = {
   slices: Slice[];
-  unit: { one: string; many: string };
+  unit: Unit;
   accessibilityLabel: string;
 };
 

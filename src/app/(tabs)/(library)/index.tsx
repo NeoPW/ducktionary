@@ -6,14 +6,15 @@ import { StyleSheet, View } from "react-native";
 import { AppText } from "@/components/app-text";
 import { BookGrid } from "@/components/book-grid";
 import { Button } from "@/components/button";
-import { EmptyState } from "@/components/empty-state";
-import { Screen } from "@/components/screen";
+import { EmptyScreen, EmptyState } from "@/components/empty-state";
+import { LoadingScreen, Screen } from "@/components/screen";
 import { SearchField } from "@/components/search-field";
 import { clearAllData, seedSampleBooks } from "@/db/seed";
 import { useBooks } from "@/hooks/use-books";
 import { spacing } from "@/theme/tokens";
 import type { Book } from "@/types";
 import { acquisitionLabel, formatLabel } from "@/utils/book-attributes";
+import { BOOKS, plural } from "@/utils/format";
 import { lengthClassLabel } from "@/utils/length-class";
 
 function matches(book: Book, query: string) {
@@ -35,40 +36,36 @@ export default function LibraryScreen() {
   const books = useBooks();
   const [query, setQuery] = useState("");
 
-  if (books.status === "loading") return <Screen>{null}</Screen>;
+  if (books.status === "loading") return <LoadingScreen />;
 
   if (books.status === "error") {
     return (
-      <Screen contentStyle={styles.centered}>
-        <EmptyState mood="confused" title="Couldn't open your library" message={books.error.message} />
-      </Screen>
+      <EmptyScreen mood="confused" title="Couldn't open your library" message={books.error.message} />
     );
   }
 
   if (books.data.length === 0) {
     return (
-      <Screen contentStyle={styles.centered}>
-        <EmptyState
-          mood="sleepy"
-          title="No books yet"
-          message="Honk one in! Scan a barcode or search for a book you've finished."
-          action={
-            <>
-              <Button title="Add a book" onPress={() => router.navigate("/add")} />
-              {__DEV__ && (
-                <Button
-                  title="Load sample books (dev)"
-                  variant="ghost"
-                  onPress={async () => {
-                    await seedSampleBooks(db);
-                    await books.reload();
-                  }}
-                />
-              )}
-            </>
-          }
-        />
-      </Screen>
+      <EmptyScreen
+        mood="sleepy"
+        title="No books yet"
+        message="Honk one in! Scan a barcode or search for a book you've finished."
+        action={
+          <>
+            <Button title="Add a book" onPress={() => router.navigate("/add")} />
+            {__DEV__ && (
+              <Button
+                title="Load sample books (dev)"
+                variant="ghost"
+                onPress={async () => {
+                  await seedSampleBooks(db);
+                  await books.reload();
+                }}
+              />
+            )}
+          </>
+        }
+      />
     );
   }
 
@@ -90,7 +87,7 @@ export default function LibraryScreen() {
             <AppText variant="caption" color="muted">
               {query.trim()
                 ? `${visible.length} of ${total} books`
-                : `${total} ${total === 1 ? "book" : "books"} read`}
+                : `${plural(total, BOOKS)} read`}
             </AppText>
           </View>
         }
@@ -119,6 +116,5 @@ export default function LibraryScreen() {
 }
 
 const styles = StyleSheet.create({
-  centered: { flexGrow: 1, justifyContent: "center" },
   header: { gap: spacing.sm },
 });

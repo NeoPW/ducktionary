@@ -2,24 +2,26 @@ import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/app-text";
+import { Card } from "@/components/card";
 import { DuckMascot } from "@/components/duck-mascot";
-import { EmptyState } from "@/components/empty-state";
+import { EmptyScreen } from "@/components/empty-state";
 import { DateField } from "@/components/form/date-field";
 import { PeriodStepper } from "@/components/period-stepper";
-import { Screen } from "@/components/screen";
+import { LoadingScreen, Screen } from "@/components/screen";
 import { SegmentedControl } from "@/components/segmented-control";
 import { StatTile } from "@/components/stat-tile";
 import { ChartSection } from "@/components/stats/chart-section";
 import { Highlights } from "@/components/stats/highlights";
 import { useBooks } from "@/hooks/use-books";
 import { usePreference } from "@/hooks/use-preference";
-import { booksInSpan, plural, summarize, type Summary } from "@/stats/compute";
 import { rangeLabel, resolveRange, stepRange, type RangeKind, type StatsRange } from "@/stats/range";
-import { fonts, radii, spacing } from "@/theme/tokens";
-import { useTheme } from "@/theme/use-theme";
+import { booksInSpan, summarize, type Summary } from "@/stats/summary";
+import { SETTING_KEYS } from "@/storage/keys";
+import { fonts, spacing } from "@/theme/tokens";
 import type { IsoDate } from "@/types";
 import { formatPrice } from "@/utils/book-attributes";
 import { toIsoDate, todayIso } from "@/utils/dates";
+import { BOOKS, plural } from "@/utils/format";
 
 const KINDS: readonly { value: RangeKind; label: string }[] = [
   { value: "year", label: "Year" },
@@ -38,7 +40,7 @@ export default function StatsScreen() {
   const today = todayIso();
   const [thisYear, thisMonth] = today.split("-").map(Number);
 
-  const [kind, setKind] = usePreference<RangeKind>("stats.range", KINDS.map((k) => k.value), "year");
+  const [kind, setKind] = usePreference<RangeKind>(SETTING_KEYS.statsRange, KINDS.map((k) => k.value), "year");
   const [yearRange, setYearRange] = useState<Extract<StatsRange, { kind: "year" }>>({ kind: "year", year: thisYear });
   const [monthRange, setMonthRange] = useState<Extract<StatsRange, { kind: "month" }>>({
     kind: "month",
@@ -51,23 +53,19 @@ export default function StatsScreen() {
     to: today,
   });
 
-  if (books.status === "loading") return <Screen>{null}</Screen>;
+  if (books.status === "loading") return <LoadingScreen />;
   if (books.status === "error") {
     return (
-      <Screen contentStyle={styles.centered}>
-        <EmptyState mood="confused" title="Couldn't load your stats" message={books.error.message} />
-      </Screen>
+      <EmptyScreen mood="confused" title="Couldn't load your stats" message={books.error.message} />
     );
   }
   if (books.data.length === 0) {
     return (
-      <Screen contentStyle={styles.centered}>
-        <EmptyState
-          mood="reading"
-          title="Nothing to count yet"
-          message="Finish a few books and your reading stats will show up here."
-        />
-      </Screen>
+      <EmptyScreen
+        mood="reading"
+        title="Nothing to count yet"
+        message="Finish a few books and your reading stats will show up here."
+      />
     );
   }
 
@@ -142,15 +140,14 @@ export default function StatsScreen() {
 }
 
 function Hero({ summary, range }: { summary: Summary; range: StatsRange }) {
-  const { colors } = useTheme();
   const when =
     range.kind === "all" ? "in total" : range.kind === "custom" ? `from ${rangeLabel(range)}` : `in ${rangeLabel(range)}`;
 
   return (
-    <View style={[styles.hero, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <Card style={styles.hero}>
       <DuckMascot mood={summary.books > 0 ? "reading" : "sleepy"} size={88} />
       <View style={styles.flex}>
-        <AppText style={styles.heroNumber} accessibilityLabel={`${plural(summary.books, { one: "book", many: "books" })} finished ${when}`}>
+        <AppText style={styles.heroNumber} accessibilityLabel={`${plural(summary.books, BOOKS)} finished ${when}`}>
           {summary.books.toLocaleString()}
         </AppText>
         <AppText color="muted">
@@ -162,7 +159,7 @@ function Hero({ summary, range }: { summary: Summary; range: StatsRange }) {
           </AppText>
         )}
       </View>
-    </View>
+    </Card>
   );
 }
 
@@ -194,13 +191,13 @@ function Tiles({ summary }: { summary: Summary }) {
       <StatTile
         label="Top category"
         value={summary.topCategory?.name ?? "–"}
-        detail={summary.topCategory ? plural(summary.topCategory.books, { one: "book", many: "books" }) : undefined}
+        detail={summary.topCategory ? plural(summary.topCategory.books, BOOKS) : undefined}
       />
       <StatTile label="Authors" value={summary.authors.toLocaleString()} detail="different authors" />
       <StatTile
         label="Spent"
         value={summary.pricedBooks ? formatPrice(summary.spentCents) : "–"}
-        detail={summary.pricedBooks ? `on ${plural(summary.pricedBooks, { one: "book", many: "books" })}` : "no prices yet"}
+        detail={summary.pricedBooks ? `on ${plural(summary.pricedBooks, BOOKS)}` : "no prices yet"}
       />
       <StatTile
         label="Average price"
@@ -212,7 +209,6 @@ function Tiles({ summary }: { summary: Summary }) {
 }
 
 const styles = StyleSheet.create({
-  centered: { flexGrow: 1, justifyContent: "center" },
   flex: { flex: 1 },
   customRow: { flexDirection: "row", gap: spacing.md },
   hero: {
@@ -220,8 +216,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.md,
     padding: spacing.lg,
-    borderRadius: radii.card,
-    borderWidth: 1,
   },
   heroNumber: { fontFamily: fonts.sansBold, fontSize: 48, lineHeight: 56 },
   heroHint: { marginTop: spacing.xs },
