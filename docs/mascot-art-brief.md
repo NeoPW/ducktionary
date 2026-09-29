@@ -1,9 +1,13 @@
-# Mascot art brief — the Ducktionary goose
+# Mascot art brief — the Ducktionary goose and duckling
 
-The white goose: 5 full-body moods, 6 pop-up poses for the goose visits, and 2 waddle frames (13 images).
+Two characters, the white goose and the yellow duckling, each with 5 full-body moods, 6 pop-up poses for the
+visits and 2 waddle frames (13 images each). Every app start casts one of them for each mood, for the pop-up and
+for the waddle (`src/components/mascot/cast.ts`); a character's set is only used once it is complete, until then
+the goose plays the part.
 
-> **Status (29 Sep 2026): all 13 drawn.** `npm run mascots:generate` shows the current state; the concept
-> explorations that led to the pop-up and waddle visits are in `docs/mascot-art/candidates/concept/` (git-ignored).
+> **Status (29 Sep 2026): all drawn.** Goose 13/13; duckling: 5 moods, two pop-up looks (`duckling-peek` with paws
+> on the edge, `duckling-wings-peek` with flapping wings, both with an extra `wave`) and 2 walk frames.
+> `npm run mascots:generate` shows the current state.
 
 Sizing, background removal, the sticker edge and compression are done by `npm run mascots:process` —
 you only generate and save the originals.
@@ -11,11 +15,14 @@ you only generate and save the originals.
 The images in `example_images/` are other artists' work. Use them as *style direction only* —
 don't upload them to a generator as a style reference, and don't ask for "in the style of" a named artist.
 
-## The character
+## The characters
 
-The approved goose is [`reference/base.png`](mascot-art/reference/base.png). Every new image is drawn from it
-(and from the finished images), so the set stays one character. The prompts — style block, the
-same-character instruction and one line per image — live in [`scripts/mascot-prompts.ts`](../scripts/mascot-prompts.ts).
+Each character has an approved base drawing, and every other image of it is drawn from that (and from its finished
+images), so each set stays one character: the goose's [`reference/base.png`](mascot-art/reference/base.png) and the
+duckling's `reference/duckling-base.png`. A new character's base is generated as a concept
+(`concept/duckling-base`) that takes only its *drawing style* from the goose; copy the chosen candidate to
+`docs/mascot-art/reference/<species>-base.png`. The prompts — a style block per character, the instructions and one
+line per image — live in [`scripts/mascot-prompts.ts`](../scripts/mascot-prompts.ts).
 
 ## Generating with the API (recommended)
 
@@ -45,14 +52,18 @@ instead of real transparency. Then run `npm run mascots:process`.
 
 ## Framing
 
-- **Full-body moods** (`goose/<mood>`): full body, 3/4 view facing left, generated at 1024 × 1536. The process
+- **Full-body moods** (`<species>/<mood>`): full body, 3/4 view facing left, generated at 1024 × 1536. The process
   script frames them at 1024 × 1024: goose at ~80% of the height, feet on a shared ground line.
-- **Pop-up poses** (`goose-peek/<pose>`): the upper body with both wings resting on the bottom edge, as if
+Folders are per character: `goose/`, `goose-peek/`, `goose-walk/` and `duckling/`, `duckling-peek/`, `duckling-walk/`.
+A character can have more than one pop-up look (the duckling also has `duckling-wings-peek/`); each visit picks the
+character 50/50, then one of its looks. Pop-up sets may add an optional `wave.png`, which enables a waving act.
+
+- **Pop-up poses** (`<species>-peek/<pose>`): the upper body with both wings resting on the bottom edge, as if
   popping up over a windowsill; the cut is flush with the bottom of the image. Framed at 768 × 768. The app swaps
   the six poses mid-animation, so they must line up exactly: draw `rest`, then make every other pose as an
   **edit** of it (`--edit docs/mascot-art/candidates/goose-peek/rest-1.png --note "…"`), which keeps the body in
   place and only changes the face.
-- **Waddle frames** (`goose-walk/step-1`, `step-2`): full body, side view, mid-step; `step-2` is an edit of
+- **Waddle frames** (`<species>-walk/step-1`, `step-2`): full body, side view, mid-step; `step-2` is an edit of
   `step-1` with the other foot lifted, so the two alternate as a walk. Framed at 768 × 768, feet on the ground line.
 - Sets that animate together (the pop-up poses, the waddle frames) are cropped with one shared box by
   `mascots:process`, so swapping images never makes the goose jump.

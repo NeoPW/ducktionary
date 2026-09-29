@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Switch, View } from "react-native";
 import { AppText } from "@/components/app-text";
 import { Button } from "@/components/button";
 import { Card } from "@/components/card";
-import { GooseMascot } from "@/components/goose-mascot";
+import { Mascot } from "@/components/mascot";
 import { useGoose } from "@/components/goose/goose-visits";
 import { Screen } from "@/components/screen";
 import { SegmentedControl } from "@/components/segmented-control";
@@ -61,11 +61,11 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <AppText variant="heading">Goose</AppText>
         <Card style={styles.gooseCard}>
-          <GooseMascot mood="confused" size={64} />
+          <Mascot mood="confused" size={64} />
           <View style={styles.flex}>
             <AppText variant="label">Surprise goose visits</AppText>
             <AppText variant="caption" color="muted">
-              Every few minutes a goose may pop up or waddle by. Poke it and it runs.
+              Every few minutes a goose or duckling may pop up or waddle by. Poke it and it runs.
             </AppText>
           </View>
           <Switch

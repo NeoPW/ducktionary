@@ -10,6 +10,8 @@
  *   npm run mascots:generate -- goose/scanning --go --edit 1 --note "…"
  *                                                            touch up candidate 1: only the note changes
  *        (--edit also takes a file path, e.g. another target's candidate to derive a pose from)
+ *   npm run mascots:generate -- concept/duckling-base --go --restyle path/to/drawing.png
+ *                                                            redraw an existing drawing in the goose's style
  *   npm run mascots:generate -- accept goose/celebrating 2   use candidate 2 (or a file path) as the raw original
  *
  * Needs OPENAI_API_KEY in .env.local (never EXPO_PUBLIC_ — it must not end up in the app).
@@ -18,11 +20,12 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { MOOD_FOLDER } from "../src/components/mascot/art.ts";
+import { artFolder, type Species } from "../src/components/mascot/art.ts";
 
 import { loadEnv } from "./env.ts";
+import { clearHaze, decode, encodePng, flattenOnWhite, type Img } from "./mascot-image.ts";
 import { root } from "./mascot-art.ts";
-import { CONCEPTS, editPrompt, fullPrompt, TARGETS, type Target } from "./mascot-prompts.ts";
+import { CONCEPTS, editPrompt, fullPrompt, restylePrompt, TARGETS, type Target } from "./mascot-prompts.ts";
 
 /** OpenAI's pick for precise edits; it keeps references closely by itself (it rejects `input_fidelity`). */
 const MODEL = "gpt-image-2.5-sunburst";
@@ -41,7 +44,11 @@ const IMAGE_LIMIT = env.MASCOT_IMAGE_LIMIT ? Number(env.MASCOT_IMAGE_LIMIT) : In
 const ALL_TARGETS = [...TARGETS, ...CONCEPTS];
 
 const file = (relative: string) => new URL(relative, root).pathname;
-const CHARACTER = "docs/mascot-art/reference/base.png";
+/** Each character's approved base drawing — every other image of it is drawn from this. */
+const CHARACTER: Record<Species, string> = {
+  goose: "docs/mascot-art/reference/base.png",
+  duckling: "docs/mascot-art/reference/duckling-base.png",
+};
 const candidatesDir = "docs/mascot-art/candidates";
 const spendLog = `${candidatesDir}/spend.json`;
 
@@ -63,6 +70,11 @@ const candidates = (t: Target) => {
     .sort((a, b) => a - b);
 };
 
+const withoutHaze = (img: Img) => {
+  clearHaze(img);
+  return img;
+};
+
 /** A candidate number of this target ("2"), or a repo-relative file path. */
 const candidateFile = (target: Target, which: string) =>
   /^\d+$/.test(which) ? `${candidatesDir}/${target.folder}/${target.name}-${which}.png` : which;
@@ -72,10 +84,14 @@ const candidateFile = (target: Target, which: string) =>
  * finished full-body moods — up to MAX_REFERENCES.
  */
 function references(target: Target): string[] {
+  // A new character's base drawing takes only a light style hint from the goose: its base alone, so the new
+  // character doesn't inherit the goose's shape.
+  if (target.intro === "style") return [CHARACTER.goose];
+  const species: Species = target.species;
   const finished = (list: Target[]) => list.map(donePath).filter((p) => fs.existsSync(file(p)));
   const sameKind = finished(TARGETS.filter((t) => t.folder === target.folder && t.id !== target.id));
-  const moods = finished(TARGETS.filter((t) => t.folder === MOOD_FOLDER && t.id !== target.id));
-  return [...new Set([CHARACTER, ...sameKind, ...moods])].slice(0, MAX_REFERENCES);
+  const moods = finished(TARGETS.filter((t) => t.folder === artFolder(species, "moods") && t.id !== target.id));
+  return [...new Set([CHARACTER[species], ...sameKind, ...moods])].slice(0, MAX_REFERENCES);
 }
 
 function estimate(quality: Quality, target: Target, refs: string[], log: SpendEntry[]): { usd: number; basis: string } {
@@ -144,12 +160,25 @@ async function generate(target: Target) {
   // --edit N: send only candidate N and ask for the one change in --note; otherwise draw from the references.
   const editOf = option("edit");
   const editFile = editOf ? candidateFile(target, editOf) : null;
-  if (editFile && (!fs.existsSync(file(editFile)) || !note)) {
-    console.error(editFile && !note ? `--edit needs --note "what to change".` : `No candidate ${editFile}.`);
+  // A concept target's own text can be the edit instruction.
+  const change = note ?? (target.exploratory ? target.prompt : undefined);
+  if (editFile && (!fs.existsSync(file(editFile)) || !change)) {
+    console.error(editFile && !change ? `--edit needs --note "what to change".` : `No candidate ${editFile}.`);
     process.exit(1);
   }
-  const refs = editFile ? [editFile] : references(target);
-  const prompt = editFile && note ? editPrompt(note) : fullPrompt(target, { withReferences: true, note });
+  // --restyle FILE: keep that drawing's design, give it the goose's finish.
+  const restyleFile = option("restyle");
+  const refs = restyleFile ? [restyleFile, CHARACTER.goose] : editFile ? [editFile] : references(target);
+  const missingBase = refs.find((ref) => !fs.existsSync(file(ref)));
+  if (missingBase) {
+    console.error(`${missingBase} doesn't exist yet — choose the character's base drawing first (see docs/mascot-art-brief.md).`);
+    process.exit(1);
+  }
+  const prompt = restyleFile
+    ? restylePrompt(target.species) + (note ? `\n\nAlso: ${note}` : "")
+    : editFile && change
+      ? editPrompt(change)
+      : fullPrompt(target, { withReferences: true, note });
   const log = readLog();
   const guess = estimate(quality, target, refs, log);
   const go = process.argv.includes("--go");
@@ -185,7 +214,11 @@ async function generate(target: Target) {
   form.append("background", "transparent");
   form.append("output_format", "png");
   form.append("n", "1");
-  for (const ref of refs) form.append("image[]", new Blob([fs.readFileSync(file(ref))], { type: "image/png" }), path.basename(ref));
+  // Every upload is cleaned of haze and put on white: editing a transparent image makes the API invent a grey haze.
+  for (const ref of refs) {
+    const png = encodePng(flattenOnWhite(withoutHaze(decode(new URL(ref, root)))));
+    form.append("image[]", new Blob([new Uint8Array(png)], { type: "image/png" }), path.basename(ref).replace(/\.\w+$/, ".png"));
+  }
 
   console.log(`\nGenerating… (this can take a minute)`);
   const response = await fetch("https://api.openai.com/v1/images/edits", {
@@ -222,7 +255,7 @@ async function generate(target: Target) {
 
 // ─── Main ───────────────────────────────────────────────────────────────────
 
-const [first, second, third] = process.argv.slice(2).filter((arg, i, all) => !arg.startsWith("--") && !all[i - 1]?.match(/^--(quality|note|edit)$/));
+const [first, second, third] = process.argv.slice(2).filter((arg, i, all) => !arg.startsWith("--") && !all[i - 1]?.match(/^--(quality|note|edit|restyle)$/));
 if (!first) overview();
 else if (first === "accept") accept(findTarget(second), third ?? "");
 else await generate(findTarget(first));

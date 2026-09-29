@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/app-text";
-import { GooseMascot } from "@/components/goose-mascot";
+import { Mascot } from "@/components/mascot";
 import type { Mood } from "@/components/mascot/art";
 import { Screen } from "@/components/screen";
 import { spacing } from "@/theme/tokens";
@@ -17,7 +17,7 @@ type EmptyStateProps = {
 export function EmptyState({ mood, title, message, action }: EmptyStateProps) {
   return (
     <View style={styles.container}>
-      <GooseMascot mood={mood} size={140} />
+      <Mascot mood={mood} size={140} />
       <AppText variant="title" style={styles.center}>
         {title}
       </AppText>

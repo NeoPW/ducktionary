@@ -4,7 +4,7 @@ import Animated, { FadeInUp, FadeOutUp } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText } from "@/components/app-text";
-import { GooseMascot } from "@/components/goose-mascot";
+import { Mascot } from "@/components/mascot";
 import type { Mood } from "@/components/mascot/art";
 import { radii, spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
@@ -47,7 +47,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             exiting={FadeOutUp.duration(180)}
             style={[styles.toast, { backgroundColor: colors.surface, borderColor: colors.accent }]}
           >
-            <GooseMascot mood={toast.mood} size={40} />
+            <Mascot mood={toast.mood} size={40} />
             <AppText variant="label" style={styles.text} numberOfLines={2}>
               {toast.text}
             </AppText>

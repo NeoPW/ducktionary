@@ -1,9 +1,10 @@
 /**
  * Turns raw generated mascot images into app-ready ones.
  *
- *   docs/mascot-art/raw/goose/<mood>.png           →  assets/mascots/goose/<mood>.png
- *   docs/mascot-art/raw/goose-peek/<pose>.png      →  assets/mascots/goose-peek/<pose>.png
- *   docs/mascot-art/raw/goose-walk/<frame>.png     →  assets/mascots/goose-walk/<frame>.png
+ *   docs/mascot-art/raw/<species>/<mood>.png         →  assets/mascots/<species>/<mood>.png
+ *   docs/mascot-art/raw/<look>-peek/<pose>.png       →  assets/mascots/<look>-peek/<pose>.png
+ *   docs/mascot-art/raw/<species>-walk/<frame>.png   →  assets/mascots/<species>-walk/<frame>.png
+ * (species: goose, duckling — see src/components/mascot/art.ts)
  *
  * For each image: remove the background (solid colour or a painted checkerboard), redraw an even
  * white sticker edge, crop, then fit it into the standard frame and save a compact PNG.
@@ -12,148 +13,12 @@
  *   npm run mascots:process
  */
 import fs from "node:fs";
-import { createRequire } from "node:module";
-import zlib from "node:zlib";
 
-import { ART_SPEC, MOOD_FOLDER, MOODS, PEEK_FOLDER, PEEK_POSES, WALK_FOLDER, WALK_FRAMES } from "../src/components/mascot/art.ts";
+import { ART_SPEC, artSet, type Species } from "../src/components/mascot/art.ts";
 import { artDir, root } from "./mascot-art.ts";
-
-type Rendered = { pixels: Buffer; width: number; height: number };
-const { Resvg } = createRequire(import.meta.url)("@resvg/resvg-js") as {
-  Resvg: new (svg: string, options?: object) => { render(): Rendered };
-};
+import { clearHaze, decode, encodePng, renderSvg, type Img } from "./mascot-image.ts";
 
 const rawDir = new URL("docs/mascot-art/raw/", root);
-
-/** Straight (not premultiplied) RGBA pixels. */
-type Img = { width: number; height: number; data: Uint8ClampedArray };
-
-// ─── Reading and writing images ─────────────────────────────────────────────
-
-function sniff(buf: Buffer): { mime: string; width: number; height: number } | null {
-  if (buf.subarray(1, 4).toString("ascii") === "PNG") {
-    return { mime: "image/png", width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
-  }
-  if (buf[0] === 0xff && buf[1] === 0xd8) {
-    for (let i = 2; i < buf.length - 9; ) {
-      if (buf[i] !== 0xff) return null;
-      const marker = buf[i + 1];
-      if (marker >= 0xc0 && marker <= 0xc3) {
-        return { mime: "image/jpeg", height: buf.readUInt16BE(i + 5), width: buf.readUInt16BE(i + 7) };
-      }
-      i += 2 + buf.readUInt16BE(i + 2);
-    }
-    return null;
-  }
-  if (buf.subarray(0, 4).toString("ascii") === "RIFF" && buf.subarray(8, 12).toString("ascii") === "WEBP") {
-    const chunk = buf.subarray(12, 16).toString("ascii");
-    if (chunk === "VP8 ") return { mime: "image/webp", width: buf.readUInt16LE(26) & 0x3fff, height: buf.readUInt16LE(28) & 0x3fff };
-    if (chunk === "VP8L") {
-      const bits = buf.readUInt32LE(21);
-      return { mime: "image/webp", width: (bits & 0x3fff) + 1, height: ((bits >> 14) & 0x3fff) + 1 };
-    }
-    if (chunk === "VP8X") return { mime: "image/webp", width: 1 + buf.readUIntLE(24, 3), height: 1 + buf.readUIntLE(27, 3) };
-  }
-  return null;
-}
-
-/** Renders an SVG and returns straight-alpha pixels (resvg hands them back premultiplied). */
-function renderSvg(svg: string): Img {
-  const out = new Resvg(svg).render();
-  const data = new Uint8ClampedArray(out.pixels);
-  for (let i = 0; i < data.length; i += 4) {
-    const a = data[i + 3];
-    if (a > 0 && a < 255) {
-      data[i] = (data[i] * 255) / a;
-      data[i + 1] = (data[i + 1] * 255) / a;
-      data[i + 2] = (data[i + 2] * 255) / a;
-    }
-  }
-  return { width: out.width, height: out.height, data };
-}
-
-function decode(file: URL): Img {
-  const buf = fs.readFileSync(file);
-  const info = sniff(buf);
-  if (!info) throw new Error("unsupported image — use PNG, JPEG or WebP");
-  const { width, height, mime } = info;
-  return renderSvg(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><image href="data:${mime};base64,${buf.toString("base64")}" width="${width}" height="${height}"/></svg>`,
-  );
-}
-
-const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
-  let c = n;
-  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-  return c >>> 0;
-});
-function crc32(buf: Buffer): number {
-  let c = 0xffffffff;
-  for (const byte of buf) c = CRC_TABLE[(c ^ byte) & 0xff] ^ (c >>> 8);
-  return (c ^ 0xffffffff) >>> 0;
-}
-
-/** RGBA PNG with per-row adaptive filtering and maximum deflate — smaller than a plain encode. */
-function encodePng({ width, height, data }: Img): Buffer {
-  const stride = width * 4;
-  const raw = Buffer.alloc((stride + 1) * height);
-  const candidate = Buffer.alloc(stride);
-  let previous = Buffer.alloc(stride);
-  for (let y = 0; y < height; y++) {
-    const row = Buffer.from(data.buffer, data.byteOffset + y * stride, stride);
-    let best = 0;
-    let bestScore = Infinity;
-    let bestRow = row;
-    for (let filter = 0; filter <= 4; filter++) {
-      let score = 0;
-      for (let i = 0; i < stride; i++) {
-        const left = i >= 4 ? row[i - 4] : 0;
-        const up = previous[i];
-        const upLeft = i >= 4 ? previous[i - 4] : 0;
-        let predicted = 0;
-        if (filter === 1) predicted = left;
-        else if (filter === 2) predicted = up;
-        else if (filter === 3) predicted = (left + up) >> 1;
-        else if (filter === 4) {
-          const p = left + up - upLeft;
-          const pa = Math.abs(p - left);
-          const pb = Math.abs(p - up);
-          const pc = Math.abs(p - upLeft);
-          predicted = pa <= pb && pa <= pc ? left : pb <= pc ? up : upLeft;
-        }
-        const value = (row[i] - predicted) & 255;
-        candidate[i] = value;
-        score += value < 128 ? value : 256 - value;
-      }
-      if (score < bestScore) {
-        bestScore = score;
-        best = filter;
-        bestRow = Buffer.from(candidate);
-      }
-    }
-    raw[y * (stride + 1)] = best;
-    bestRow.copy(raw, y * (stride + 1) + 1);
-    previous = Buffer.from(row);
-  }
-  const chunk = (type: string, body: Buffer) => {
-    const head = Buffer.alloc(8);
-    head.writeUInt32BE(body.length, 0);
-    head.write(type, 4, "ascii");
-    const crc = Buffer.alloc(4);
-    crc.writeUInt32BE(crc32(Buffer.concat([head.subarray(4), body])), 0);
-    return Buffer.concat([head, body, crc]);
-  };
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(width, 0);
-  ihdr.writeUInt32BE(height, 4);
-  ihdr.set([8, 6, 0, 0, 0], 8); // 8-bit RGBA, no interlace
-  return Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    chunk("IHDR", ihdr),
-    chunk("IDAT", zlib.deflateSync(raw, { level: 9 })),
-    chunk("IEND", Buffer.alloc(0)),
-  ]);
-}
 
 // ─── Background removal ─────────────────────────────────────────────────────
 
@@ -301,6 +166,13 @@ function removeBackground(img: Img): { removed: number; colours: string[] } {
   return { removed: removed / (w * h), colours: transparentEdge >= 0.6 ? ["transparent"] : colours.map(hex) };
 }
 
+/** More than 5% semi-transparent pixels: a haze to clear, not just anti-aliased edges. */
+function hasHaze({ data: d, width, height }: Img) {
+  let partial = 0;
+  for (let i = 3; i < d.length; i += 4) if (d[i] > 8 && d[i] < 200) partial++;
+  return partial / (width * height) > 0.05;
+}
+
 /** Clears stray specks: anything not connected to a large part of the drawing. */
 function dropSpecks(img: Img) {
   const { width: w, height: h, data: d } = img;
@@ -397,10 +269,6 @@ function bounds({ width: w, height: h, data: d }: Img) {
 type Kind = "mascot" | "peek" | "walk";
 type Box = { x: number; y: number; width: number; height: number };
 
-/** Clears the faint haze some generators leave around a transparent drawing, so it can't widen the crop. */
-function clearHaze({ data: d }: Img) {
-  for (let i = 3; i < d.length; i += 4) if (d[i] < 48) d[i] = 0;
-}
 
 function union(boxes: Box[]): Box {
   const x0 = Math.min(...boxes.map((b) => b.x));
@@ -417,7 +285,13 @@ function union(boxes: Box[]): Box {
  * walk — full body mid-step: feet on the ground line at 96%, centred.
  * Peek poses and walk frames are cropped with one shared box per set, so swapping them never jumps.
  */
-function frame(img: Img, box: Box, kind: Kind): Img {
+/**
+ * The round duckling looks heavier than the tall goose at the same frame size, so its moods and walk frames are
+ * drawn at 85% (its pop-up is already smaller).
+ */
+const SPECIES_SCALE: Record<Species, number> = { goose: 1, duckling: 0.85 };
+
+function frame(img: Img, box: Box, kind: Kind, species: Species): Img {
   const crop: Img = { width: box.width, height: box.height, data: new Uint8ClampedArray(box.width * box.height * 4) };
   for (let y = 0; y < box.height; y++) {
     const from = ((box.y + y) * img.width + box.x) * 4;
@@ -425,7 +299,8 @@ function frame(img: Img, box: Box, kind: Kind): Img {
   }
   const { width: W, height: H } = ART_SPEC[kind];
   const fit = { mascot: [0.8, 0.92, 0.93], peek: [0.97, 0.96, 1], walk: [0.86, 0.94, 0.96] }[kind];
-  const scale = Math.min((fit[0] * H) / box.height, (fit[1] * W) / box.width);
+  const scale =
+    Math.min((fit[0] * H) / box.height, (fit[1] * W) / box.width) * (kind === "peek" ? 1 : SPECIES_SCALE[species]);
   const x = (W - box.width * scale) / 2;
   const y = fit[2] * H - box.height * scale;
   const href = `data:image/png;base64,${encodePng(crop).toString("base64")}`;
@@ -436,17 +311,18 @@ function frame(img: Img, box: Box, kind: Kind): Img {
 
 // ─── Run ────────────────────────────────────────────────────────────────────
 
-const FOLDERS: Record<string, { kind: Kind; names: readonly string[] }> = {
-  [MOOD_FOLDER]: { kind: "mascot", names: MOODS },
-  [PEEK_FOLDER]: { kind: "peek", names: PEEK_POSES },
-  [WALK_FOLDER]: { kind: "walk", names: WALK_FRAMES },
-};
+/** Which frame each set gets: moods use the mascot frame, visits their own. */
+const FRAME_KIND = { moods: "mascot", peek: "peek", walk: "walk" } as const satisfies Record<string, Kind>;
 
-type Job = { raw: URL; out: URL; label: string; kind: Kind; folder: string };
+type Job = { raw: URL; out: URL; label: string; kind: Kind; folder: string; species: Species };
 const jobs: Job[] = [];
 if (!fs.existsSync(rawDir)) fs.mkdirSync(rawDir, { recursive: true });
 for (const folder of fs.readdirSync(rawDir, { withFileTypes: true }).filter((e) => e.isDirectory())) {
-  const spec = FOLDERS[folder.name];
+  const set = artSet(folder.name);
+  const spec = set && {
+    kind: FRAME_KIND[set.kind.kind],
+    names: [...set.kind.names, ...set.kind.optional] as readonly string[],
+  };
   if (!spec) {
     console.log(`! docs/mascot-art/raw/${folder.name}/: unknown folder — skipped`);
     continue;
@@ -464,6 +340,7 @@ for (const folder of fs.readdirSync(rawDir, { withFileTypes: true }).filter((e) 
       label: `${folder.name}/${name}`,
       kind: spec.kind,
       folder: folder.name,
+      species: set!.species,
     });
   }
 }
@@ -476,8 +353,9 @@ for (const job of jobs) {
   try {
     const img = decode(job.raw);
     const { removed, colours } = removeBackground(img);
-    // Only the animated sets: re-running must not change the approved moods.
-    if (job.kind !== "mascot") clearHaze(img);
+    // Haze would widen the crop and tint the corners. Moods only get it when there's real haze, so re-running
+    // never changes the approved ones.
+    if (job.kind !== "mascot" || hasHaze(img)) clearHaze(img);
     dropSpecks(img);
     // Sticker edge ≈ 1.4% of the drawing's size, like the references.
     const drawn = bounds(img);
@@ -502,7 +380,7 @@ for (const folder of new Set(prepared.filter((p) => p.job.kind !== "mascot").map
 
 // 3. Frame and save.
 for (const { job, img, box, background } of prepared) {
-  const png = encodePng(frame(img, sharedBox.get(job.folder) ?? box, job.kind));
+  const png = encodePng(frame(img, sharedBox.get(job.folder) ?? box, job.kind, job.species));
   fs.mkdirSync(new URL(".", job.out), { recursive: true });
   fs.writeFileSync(job.out, png);
   const { width: W, height: H } = ART_SPEC[job.kind];

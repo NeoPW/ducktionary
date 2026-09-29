@@ -13,7 +13,7 @@ const { Resvg } = createRequire(import.meta.url)("@resvg/resvg-js") as {
   Resvg: new (svg: string, options: object) => { render(): { asPng(): Buffer } };
 };
 
-const reading = scanArt().moods.reading;
+const reading = scanArt().art.moods.goose?.reading;
 if (!reading) {
   console.error("No assets/mascots/goose/reading.png — draw and process it first (see docs/mascot-art-brief.md).");
   process.exit(1);

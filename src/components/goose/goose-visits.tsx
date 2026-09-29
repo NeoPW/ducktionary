@@ -24,7 +24,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 
 import { AppText } from "@/components/app-text";
-import { PEEK_POSES, WALK_FRAMES, type PeekPose, type WalkFrame } from "@/components/mascot/art";
+import {
+  OPTIONAL_PEEK_POSES,
+  PEEK_LOOKS,
+  PEEK_POSES,
+  SPECIES,
+  WALK_FRAMES,
+  type PeekLook,
+  type PeekPose,
+  type Species,
+  type WalkFrame,
+} from "@/components/mascot/art";
 import { PEEK_IMAGES, WALK_IMAGES } from "@/components/mascot/images.generated";
 import { SETTING_KEYS } from "@/storage/keys";
 import { readSetting, writeSetting } from "@/storage/settings";
@@ -81,11 +91,22 @@ export function GooseProvider({ children }: { children: ReactNode }) {
 type GooseHandle = { summon: () => void };
 
 /** Pop-up acts: the goose rises from a screen edge, does its thing and ducks away again. */
-type PopupAct = "honk" | "look" | "peck" | "suspicious" | "wink" | "steal";
+type PopupAct = "honk" | "look" | "peck" | "suspicious" | "wink" | "steal" | "wave";
 type Edge = "bottom" | "top" | "left" | "right";
+/** One character popping up; a pop-up visit has one or, now and then, two. */
+type PopupActor = {
+  key: string;
+  species: Species;
+  /** Which of the character's pop-up sets (the duckling has two). */
+  look: PeekLook;
+  act: PopupAct | "flee";
+  edge: Edge;
+  along: number;
+  mirrored: boolean;
+};
 type Visit =
-  | { id: number; kind: "popup"; act: PopupAct | "flee"; edge: Edge; along: number; mirrored: boolean }
-  | { id: number; kind: "waddle"; act: "waddle" | "flee"; fromLeft: boolean; bottom: number };
+  | { id: number; kind: "popup"; actors: PopupActor[] }
+  | { id: number; kind: "waddle"; species: Species; act: "waddle" | "flee"; fromLeft: boolean; bottom: number };
 
 const POPUP_ACTS: readonly PopupAct[] = ["honk", "honk", "look", "peck", "suspicious", "wink", "steal"];
 /** The bottom is the classic windowsill, so it comes up a little more often. */
@@ -110,9 +131,30 @@ const NEXT_VISIT_MS: [number, number] = [90_000, 240_000];
 const WALK_SPEED = 75;
 const STEP_MS = 170;
 
-/** Drawn sets are used only when complete, so a visit never shows a missing pose. */
-const CAN_POP_UP = PEEK_POSES.every((pose) => PEEK_IMAGES[pose]);
-const CAN_WADDLE = WALK_FRAMES.every((frame) => WALK_IMAGES[frame]);
+/**
+ * Who can visit: characters whose pop-up or walk set is complete, so a visit never shows a missing pose. Each
+ * visit picks one of them at random; now and then a goose and a duckling pop up together.
+ */
+const POP_UP_LOOKS = PEEK_LOOKS.filter(({ look }) => PEEK_POSES.every((pose) => PEEK_IMAGES[look]?.[pose]));
+const POP_UP_SPECIES = SPECIES.filter((sp) => POP_UP_LOOKS.some((l) => l.species === sp));
+/** The character comes first (so geese and ducklings stay 50/50), then one of its looks. */
+const pickLook = (species: Species) => pick(POP_UP_LOOKS.filter((l) => l.species === species)).look;
+/** Acts a look can play: the wave only where the set has a waving pose. */
+const actsFor = (look: PeekLook): readonly PopupAct[] =>
+  PEEK_IMAGES[look]?.wave ? [...POPUP_ACTS, "wave"] : POPUP_ACTS;
+/** Every pose a set may have, mounted together so switching never flickers. */
+const ALL_PEEK_POSES: readonly PeekPose[] = [...PEEK_POSES, ...OPTIONAL_PEEK_POSES];
+const WADDLE_SPECIES = SPECIES.filter((sp) => WALK_FRAMES.every((frame) => WALK_IMAGES[sp]?.[frame]));
+const CAN_POP_UP = POP_UP_SPECIES.length > 0;
+const CAN_WADDLE = WADDLE_SPECIES.length > 0;
+/** Share of pop-ups where two characters pop up at once. */
+const PAIR_SHARE = 0.2;
+
+/** What each character shouts. */
+const SOUND: Record<Species, { loud: string; soft: string }> = {
+  goose: { loud: "HONK!", soft: "honk" },
+  duckling: { loud: "QUACK!", soft: "quack" },
+};
 
 const between = ([min, max]: [number, number]) => min + Math.random() * (max - min);
 const pick = <T,>(items: readonly T[]) => items[Math.floor(Math.random() * items.length)];
@@ -126,6 +168,7 @@ function GooseVisits({ enabled, ref }: { enabled: boolean; ref: Ref<GooseHandle>
   const [reduceMotion, setReduceMotion] = useState(false);
   const [retries, setRetries] = useState(0);
   const visitsSoFar = useRef(0);
+  const finished = useRef(new Set<string>());
 
   useEffect(() => {
     AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
@@ -141,20 +184,22 @@ function GooseVisits({ enabled, ref }: { enabled: boolean; ref: Ref<GooseHandle>
       const lowest = insets.bottom + 4;
       const highest = height - insets.top - 56 - walkSize(width);
       const bottom = lowest + Math.random() * Math.max(0, highest - lowest);
-      setVisit({ id, kind: "waddle", act: "waddle", fromLeft: Math.random() < 0.5, bottom });
+      const species = pick(WADDLE_SPECIES);
+      setVisit({ id, kind: "waddle", species, act: "waddle", fromLeft: Math.random() < 0.5, bottom });
       return;
     }
-    const size = peekSize(width);
-    const edge = pick(EDGES);
-    const horizontal = edge === "bottom" || edge === "top";
-    // Somewhere along the edge, clear of the corners (and of the header and tab bar on the side edges).
-    const along = horizontal
-      ? 12 + Math.random() * Math.max(0, width - size - 24)
-      : height * 0.15 + Math.random() * Math.max(0, height * 0.6 - size);
-    // Turn the head towards the middle of the screen.
-    const towardsMiddle = Math.sign((horizontal ? width : height) / 2 - (along + size / 2)) || 1;
-    const mirrored = towardsMiddle !== EDGE_GEOMETRY[edge].head;
-    setVisit({ id, kind: "popup", act: pick(POPUP_ACTS), edge, along, mirrored });
+    const pair = POP_UP_SPECIES.length > 1 && Math.random() < PAIR_SHARE;
+    const cast = pair ? shuffle(POP_UP_SPECIES) : [pick(POP_UP_SPECIES)];
+    // A pair comes from two different edges, so they never overlap.
+    const edges = shuffle(EDGES.filter((e, i) => EDGES.indexOf(e) === i));
+    const first = pick(EDGES);
+    const actors = cast.map((species, i) => {
+      const edge = i === 0 ? first : edges.find((e) => e !== first)!;
+      const look = pickLook(species);
+      const place = placeOnEdge(edge, peekSize(width), width, height);
+      return { key: species, species, look, act: pick(actsFor(look)), edge, ...place };
+    });
+    setVisit({ id, kind: "popup", actors });
   };
 
   // "Summon the goose" in Settings calls this directly.
@@ -180,9 +225,21 @@ function GooseVisits({ enabled, ref }: { enabled: boolean; ref: Ref<GooseHandle>
 
   if (!visit) return null;
 
-  // Poke the goose and it honks and runs.
-  const flee = () => visit.act !== "flee" && setVisit({ ...visit, id: Date.now(), act: "flee" } as Visit);
-  const done = () => setVisit(null);
+  // Poke a visitor and it honks and runs (a pair runs together).
+  const flee = () => {
+    if (visit.kind === "waddle") {
+      if (visit.act !== "flee") setVisit({ ...visit, id: Date.now(), act: "flee" });
+    } else if (visit.actors.some((a) => a.act !== "flee")) {
+      setVisit({ ...visit, id: Date.now(), actors: visit.actors.map((a) => ({ ...a, act: "flee" })) });
+    }
+  };
+  // The visit is over once every visitor has left.
+  const done = (key: string) => {
+    finished.current.add(`${visit.id}:${key}`);
+    if (visit.kind === "waddle" || visit.actors.every((a) => finished.current.has(`${visit.id}:${a.key}`))) {
+      setVisit(null);
+    }
+  };
 
   return (
     <View
@@ -192,13 +249,34 @@ function GooseVisits({ enabled, ref }: { enabled: boolean; ref: Ref<GooseHandle>
       accessibilityElementsHidden
     >
       {visit.kind === "popup" ? (
-        <PopUp visit={visit} size={peekSize(width)} onPoke={flee} onDone={done} />
+        visit.actors.map((actor) => (
+          <PopUp
+            key={actor.key}
+            actor={actor}
+            visitId={visit.id}
+            size={peekSize(width)}
+            onPoke={flee}
+            onDone={() => done(actor.key)}
+          />
+        ))
       ) : (
-        <Waddle visit={visit} size={walkSize(width)} screenWidth={width} onPoke={flee} onDone={done} />
+        <Waddle visit={visit} size={walkSize(width)} screenWidth={width} onPoke={flee} onDone={() => done("walker")} />
       )}
     </View>
   );
 }
+
+/** Somewhere along the edge, clear of the corners (and the header and tab bar on the sides), facing the middle. */
+function placeOnEdge(edge: Edge, size: number, width: number, height: number) {
+  const horizontal = edge === "bottom" || edge === "top";
+  const along = horizontal
+    ? 12 + Math.random() * Math.max(0, width - size - 24)
+    : height * 0.15 + Math.random() * Math.max(0, height * 0.6 - size);
+  const towardsMiddle = Math.sign((horizontal ? width : height) / 2 - (along + size / 2)) || 1;
+  return { along, mirrored: towardsMiddle !== EDGE_GEOMETRY[edge].head };
+}
+
+const shuffle = <T,>(items: readonly T[]) => [...items].sort(() => Math.random() - 0.5);
 
 const peekSize = (screenWidth: number) => Math.min(170, screenWidth * 0.42);
 const walkSize = (screenWidth: number) => Math.min(130, screenWidth * 0.34);
@@ -223,19 +301,21 @@ function useScript(run: (step: (ms: number) => Promise<boolean>) => Promise<void
 // ─── Pop-up: the upper body rises from a screen edge ────────────────────────
 
 function PopUp({
-  visit,
+  actor,
+  visitId,
   size,
   onPoke,
   onDone,
 }: {
-  visit: Extract<Visit, { kind: "popup" }>;
+  actor: PopupActor;
+  visitId: number;
   size: number;
   onPoke: () => void;
   onDone: () => void;
 }) {
-  const [pose, setPose] = useState<PeekPose>(visit.act === "steal" ? "steal" : "rest");
-  const [mirrored, setMirrored] = useState(visit.mirrored);
-  const { angle, out } = EDGE_GEOMETRY[visit.edge];
+  const [pose, setPose] = useState<PeekPose>(actor.act === "steal" ? "steal" : "rest");
+  const [mirrored, setMirrored] = useState(actor.mirrored);
+  const { angle, out } = EDGE_GEOMETRY[actor.edge];
   const [bubble, setBubble] = useState<string | null>(null);
 
   const rise = useSharedValue(0); // 0 hidden beyond the edge … 1 fully in
@@ -268,12 +348,12 @@ function PopUp({
       };
       const say = (text: string | null) => setBubble(text);
 
-      switch (visit.act) {
+      switch (actor.act) {
         case "honk":
           up();
           if (!(await step(700))) return;
           setPose("honk");
-          say("HONK!");
+          say(SOUND[actor.species].loud);
           shake();
           if (!(await step(1000))) return;
           setPose("rest");
@@ -329,6 +409,16 @@ function PopUp({
           say(null);
           if (!(await step(300))) return;
           break;
+        case "wave":
+          up();
+          if (!(await step(650))) return;
+          setPose("wave");
+          say("hi!");
+          if (!(await step(1300))) return;
+          setPose("rest");
+          say(null);
+          if (!(await step(300))) return;
+          break;
         case "steal":
           up();
           if (!(await step(700))) return;
@@ -340,7 +430,7 @@ function PopUp({
           break;
         case "flee":
           setPose("honk");
-          say("HONK!");
+          say(SOUND[actor.species].loud);
           shake();
           if (!(await step(450))) return;
           say(null);
@@ -352,13 +442,13 @@ function PopUp({
       if (!(await step(420))) return;
       onDone();
     },
-    [visit.id],
+    [visitId],
   );
 
   return (
     <Animated.View
       pointerEvents="box-none"
-      style={[styles.popup, { width: size, height: size }, EDGE_POSITION[visit.edge](visit.along), slideStyle]}
+      style={[styles.popup, { width: size, height: size }, EDGE_POSITION[actor.edge](actor.along), slideStyle]}
     >
       <View pointerEvents="box-none" style={{ width: size, height: size, transform: [{ rotate: `${angle}deg` }] }}>
         <Animated.View
@@ -367,10 +457,10 @@ function PopUp({
         >
           <Pressable onPress={onPoke} style={[{ width: size, height: size }, mirrored && styles.mirrored]}>
             {/* All poses stay mounted and only the current one shows, so switching never flickers. */}
-            {PEEK_POSES.map((name) => (
+            {ALL_PEEK_POSES.filter((name) => PEEK_IMAGES[actor.look]?.[name]).map((name) => (
               <Image
                 key={name}
-                source={PEEK_IMAGES[name]}
+                source={PEEK_IMAGES[actor.look]?.[name]}
                 style={[StyleSheet.absoluteFill, { opacity: name === pose ? 1 : 0 }]}
                 contentFit="contain"
                 transition={0}
@@ -380,7 +470,7 @@ function PopUp({
         </Animated.View>
       </View>
       {/* The bubble stays upright, on the screen side of the goose. */}
-      {bubble && <Bubble text={bubble} style={[BUBBLE_POSITION[visit.edge](size)]} />}
+      {bubble && <Bubble text={bubble} style={[BUBBLE_POSITION[actor.edge](size)]} />}
     </Animated.View>
   );
 }
@@ -439,7 +529,7 @@ function Waddle({
         return ms;
       };
       if (visit.act === "flee") {
-        setBubble("HONK!");
+        setBubble(SOUND[visit.species].loud);
         setWalking(true);
         if (!(await step(walkTo(to, WALK_SPEED * 4)))) return;
         onDone();
@@ -451,7 +541,7 @@ function Waddle({
       setWalking(false);
       setFrame("step-1");
       if (!(await step(350))) return;
-      setBubble("honk");
+      setBubble(SOUND[visit.species].soft);
       if (!(await step(900))) return;
       setBubble(null);
       setWalking(true);
@@ -470,7 +560,7 @@ function Waddle({
         {WALK_FRAMES.map((name) => (
           <Image
             key={name}
-            source={WALK_IMAGES[name]}
+            source={WALK_IMAGES[visit.species]?.[name]}
             style={[StyleSheet.absoluteFill, { opacity: name === frame ? 1 : 0 }]}
             contentFit="contain"
             transition={0}

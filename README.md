@@ -43,8 +43,9 @@ npm run supabase:check      # attack-test the backup server (after setting it up
 
 ## Mascots
 
-The mascot is a drawn white goose: five moods for the app's screens, plus pop-up poses and waddle frames for the
-goose visits. The images live in `assets/mascots/`; how they are made is in `docs/mascot-art-brief.md`.
+The mascots are a drawn white goose and a yellow duckling: five moods each for the app's screens, plus pop-up poses
+and waddle frames for the visits. Each app start casts one of them for every part, so they mix. The images live in
+`assets/mascots/`; how they are made is in `docs/mascot-art-brief.md`.
 
 ```bash
 npm run mascots:generate  # draw one image with the OpenAI API (dry run unless --go; see the brief)

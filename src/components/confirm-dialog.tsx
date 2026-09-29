@@ -3,7 +3,7 @@ import { Modal, Pressable, StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/app-text";
 import { Button } from "@/components/button";
-import { GooseMascot } from "@/components/goose-mascot";
+import { Mascot } from "@/components/mascot";
 import type { Mood } from "@/components/mascot/art";
 import { radii, spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
@@ -63,7 +63,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               onStartShouldSetResponder={() => true}
               accessibilityViewIsModal
             >
-              <GooseMascot mood={pending.mood ?? (pending.destructive ? "confused" : "reading")} size={72} />
+              <Mascot mood={pending.mood ?? (pending.destructive ? "confused" : "reading")} size={72} />
               <AppText variant="title" style={styles.center} accessibilityRole="header">
                 {pending.title}
               </AppText>

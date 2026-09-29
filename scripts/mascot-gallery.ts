@@ -1,13 +1,23 @@
 /**
- * Builds docs/mascot-gallery.html: every drawn goose image (moods, pop-up poses, waddle frames) and the
- * app icons, with a small live demo of the goose visits. Self-contained — open it in any browser.
+ * Builds docs/mascot-gallery.html: every drawn image for both characters (moods, pop-up poses, waddle frames)
+ * and the app icons, with a small live demo of the visits. Self-contained — open it in any browser.
  *
  *   npm run mascots
  */
 import fs from "node:fs";
 
-import { MOODS, PEEK_POSES, WALK_FRAMES, type Mood, type PeekPose } from "../src/components/mascot/art.ts";
-import { ART_SETS, isUsable, pngDataUri, root, scanArt, type ArtFile } from "./mascot-art.ts";
+import {
+  ART_SETS,
+  MOODS,
+  OPTIONAL_PEEK_POSES,
+  PEEK_POSES,
+  WALK_FRAMES,
+  type ArtKind,
+  type Mood,
+  type PeekPose,
+  type Species,
+} from "../src/components/mascot/art.ts";
+import { isUsable, pngDataUri, root, scanArt, type ArtFile } from "./mascot-art.ts";
 
 const art = scanArt();
 const out = new URL("docs/mascot-gallery.html", root);
@@ -36,50 +46,63 @@ const POSE_NOTES: Record<PeekPose, string> = {
   suspicious: "Rises only to eye level",
   wink: "A wink and a heart",
   steal: "Pops up with a book: “mine now”",
+  wave: "Waves hello (only sets that have it)",
 };
 
-const card = (image: string, name: string, note: string, path: string, stage = "") => `
+const SOUND: Record<Species, string> = { goose: "HONK!", duckling: "QUACK!" };
+
+/** One card per image name, with every set of that kind side by side (two characters, or three pop-up looks). */
+const card = (kind: ArtKind, name: string, label: string, note: string, edge = false) => {
+  const sets = ART_SETS.filter((set) => set.kind.kind === kind);
+  const pictures = sets
+    .map((set) => `<div class="stage${edge ? " edge" : ""}">${picture(art.art[kind][set.look]?.[name], `${title(set.look)}, ${label}`)}</div>`)
+    .join("");
+  const paths = sets.map((set) => `${set.folder}/${name}.png`).join(" · ");
+  return `
   <figure class="card">
-    <div class="stage${stage}">${image}</div>
-    <figcaption><strong>${name}</strong><span>${note}</span><code>${path}</code></figcaption>
+    <div class="pair" style="grid-template-columns: repeat(${sets.length}, 1fr)">${pictures}</div>
+    <figcaption><strong>${title(label)}</strong><span>${note}</span><code>${paths}</code></figcaption>
   </figure>`;
+};
 
-const moodCards = MOODS.map((m) =>
-  card(picture(art.moods[m], `Goose, ${m}`), title(m), MOOD_NOTES[m], `goose/${m}.png`),
-).join("");
-const poseCards = PEEK_POSES.map((p) =>
-  card(picture(art.peek[p], `Goose popping up, ${p}`), title(p), POSE_NOTES[p], `goose-peek/${p}.png`, " edge"),
-).join("");
-const walkCards = WALK_FRAMES.map((f) =>
-  card(picture(art.walk[f], `Goose waddling, ${f}`), `Waddle, ${f}`, "Alternates with the other step", `goose-walk/${f}.png`),
-).join("");
+const moodCards = MOODS.map((m) => card("moods", m, m, MOOD_NOTES[m])).join("");
+const poseCards = [...PEEK_POSES, ...OPTIONAL_PEEK_POSES]
+  .map((p) => card("peek", p, `popping up, ${p}`, POSE_NOTES[p], true))
+  .join("");
+const walkCards = WALK_FRAMES.map((f) => card("walk", f, `waddle, ${f}`, "Alternates with the other step")).join("");
 
-const total = ART_SETS.reduce((n, set) => n + set.names.length, 0);
+const total = ART_SETS.reduce((n, set) => n + set.kind.names.length, 0);
 const drawn = total - art.missing.length;
 const progress = `
   <section aria-labelledby="progress">
     <div class="head"><h2 id="progress">Art progress</h2><p class="lede">${drawn} of ${total} images drawn. Generate or add originals as described in <code>docs/mascot-art-brief.md</code>, then run <code>npm run mascots:process</code>.</p></div>
     <div class="meter" role="img" aria-label="${drawn} of ${total} drawn"><span style="width:${(drawn / total) * 100}%"></span></div>
-    ${art.missing.length ? `<ul class="list">${art.missing.map((m) => `<li><code>${m}</code></li>`).join("")}</ul>` : ""}
+    ${art.missing.length ? `<details><summary>${art.missing.length} still to draw</summary><ul class="list">${art.missing.map((m) => `<li><code>${m}</code></li>`).join("")}</ul></details>` : ""}
     ${art.warnings.length ? `<ul class="list warn">${art.warnings.map((w) => `<li>${w}</li>`).join("")}</ul>` : ""}
   </section>`;
 
-// The live demo uses the real images: a pop-up honk and a waddle with alternating steps.
-const demoPeek = art.peek.rest && art.peek.honk;
-const demoWalk = art.walk["step-1"] && art.walk["step-2"];
-const demo =
-  demoPeek && demoWalk
-    ? `
-    <div class="demo" id="demo" data-play="">
-      <div class="popup"><span class="bubble">HONK!</span>
-        <img class="rest" src="${pngDataUri(art.peek.rest!)}" alt=""><img class="honk" src="${pngDataUri(art.peek.honk!)}" alt="">
+// The live demo uses the real images: each pop-up look honking, and its character waddling when it can.
+const demos = ART_SETS.filter((set) => set.kind.kind === "peek").flatMap((set) => {
+  const peek = art.art.peek[set.look];
+  const walk = art.art.walk[set.species];
+  if (!peek?.rest || !peek.honk) return [];
+  const walks = walk?.["step-1"] && walk["step-2"];
+  return [
+    `
+    <div class="demo-block">
+      <div class="demo" data-play="">
+        <div class="popup"><span class="bubble">${SOUND[set.species]}</span>
+          <img class="rest" src="${pngDataUri(peek.rest)}" alt=""><img class="honk" src="${pngDataUri(peek.honk)}" alt="">
+        </div>
+        ${walks ? `<div class="walker"><img class="s1" src="${pngDataUri(walk["step-1"]!)}" alt=""><img class="s2" src="${pngDataUri(walk["step-2"]!)}" alt=""></div>` : ""}
       </div>
-      <div class="walker">
-        <img class="s1" src="${pngDataUri(art.walk["step-1"]!)}" alt=""><img class="s2" src="${pngDataUri(art.walk["step-2"]!)}" alt="">
-      </div>
-    </div>
-    <div class="buttons"><button type="button" data-play="popup">Pop up</button><button type="button" data-play="waddle">Waddle</button></div>`
-    : `<p class="lede">The demo appears once the pop-up poses and both waddle frames are drawn.</p>`;
+      <div class="buttons"><button type="button" data-play="popup">${title(set.look)} pops up</button>${walks ? `<button type="button" data-play="waddle">${title(set.species)} waddles</button>` : ""}</div>
+    </div>`,
+  ];
+});
+const demo = demos.length
+  ? demos.join("")
+  : `<p class="lede">The demo appears once a character's pop-up poses and both waddle frames are drawn.</p>`;
 
 const generated = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
 
@@ -88,7 +111,7 @@ const html = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Ducktionary Goose</title>
+<title>Ducktionary Mascots</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@600&family=Nunito:wght@400;600;700;800&display=swap">
@@ -137,11 +160,14 @@ code { font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size:
 .meter span { display: block; height: 100%; background: var(--accent); }
 .list { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
 .warn li { color: var(--danger); }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
 .card { margin: 0; display: grid; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 12px; }
 .card .stage { position: relative; display: grid; place-items: center; aspect-ratio: 1; border-radius: 12px; background: var(--stage); overflow: hidden; }
 .card .stage img { width: 100%; height: 100%; object-fit: contain; }
 .card .stage.edge { border-bottom: 3px solid var(--border); }
+.pair { display: grid; gap: 8px; }
+.demo-block { display: grid; gap: 12px; }
+details summary { cursor: pointer; color: var(--muted); }
 .missing { color: var(--muted); font-size: 0.85rem; border: 2px dashed var(--border); border-radius: 10px; padding: 18px 12px; }
 .flag { position: absolute; top: 6px; left: 6px; font-size: 0.7rem; font-weight: 800; color: var(--danger); background: var(--surface); border-radius: 999px; padding: 1px 8px; }
 figcaption { display: grid; gap: 2px; padding: 0 4px 2px; font-size: 0.9rem; }
@@ -181,9 +207,9 @@ footer { color: var(--muted); font-size: 0.85rem; }
   <div class="top">
     <img src="${icon("icon.png")}" alt="Ducktionary app icon">
     <div class="text">
-      <span class="eyebrow">Ducktionary · mascot</span>
-      <h1>The goose</h1>
-      <p class="lede">Every drawn goose in the app: the five moods, the pop-up poses and the waddle — plus the app icons made from them.</p>
+      <span class="eyebrow">Ducktionary · mascots</span>
+      <h1>Goose &amp; duckling</h1>
+      <p class="lede">Every drawn image in the app, for both characters: the five moods, the pop-up poses and the waddle — plus the app icons. Each app start casts one of them for every part.</p>
     </div>
     <div class="theme" role="group" aria-label="Backdrop">
       <button type="button" data-set="light" aria-pressed="false">Light</button>
@@ -197,7 +223,7 @@ ${progress}
   </section>
 
   <section aria-labelledby="visits">
-    <div class="head"><h2 id="visits">Goose visits</h2><p class="lede">Every few minutes the goose pops up from a screen edge (turned for the top and sides) or waddles across. Poke it and it honks and runs.</p></div>
+    <div class="head"><h2 id="visits">Goose visits</h2><p class="lede">Every few minutes a goose or duckling pops up from a screen edge (turned for the top and sides) or waddles across. Poke it and it runs.</p></div>
     ${demo}
     <div class="grid">${poseCards}${walkCards}</div>
   </section>
@@ -222,8 +248,8 @@ ${progress}
   const sync = () => buttons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.set === current())));
   buttons.forEach((b) => b.addEventListener("click", () => { root.dataset.theme = b.dataset.set; sync(); }));
   sync();
-  const demo = document.getElementById("demo");
   document.querySelectorAll(".buttons button").forEach((b) => b.addEventListener("click", () => {
+    const demo = b.closest(".demo-block").querySelector(".demo");
     demo.dataset.play = "";
     void demo.offsetWidth; // restart the animation
     demo.dataset.play = b.dataset.play;
