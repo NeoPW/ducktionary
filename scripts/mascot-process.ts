@@ -1,8 +1,9 @@
 /**
  * Turns raw generated mascot images into app-ready ones.
  *
- *   docs/mascot-art/raw/<species>/<mood>.png       →  assets/mascots/<species>/<mood>.png
+ *   docs/mascot-art/raw/goose/<mood>.png           →  assets/mascots/goose/<mood>.png
  *   docs/mascot-art/raw/goose-peek/<pose>.png      →  assets/mascots/goose-peek/<pose>.png
+ *   docs/mascot-art/raw/goose-walk/<frame>.png     →  assets/mascots/goose-walk/<frame>.png
  *
  * For each image: remove the background (solid colour or a painted checkerboard), redraw an even
  * white sticker edge, crop, then fit it into the standard frame and save a compact PNG.
@@ -14,8 +15,7 @@ import fs from "node:fs";
 import { createRequire } from "node:module";
 import zlib from "node:zlib";
 
-import { ART_SPEC, PEEK_FOLDER, PEEK_POSES } from "../src/components/mascot/art.ts";
-import { MOODS, SPECIES } from "../src/components/mascot/shapes.ts";
+import { ART_SPEC, MOOD_FOLDER, MOODS, PEEK_FOLDER, PEEK_POSES, WALK_FOLDER, WALK_FRAMES } from "../src/components/mascot/art.ts";
 import { artDir, root } from "./mascot-art.ts";
 
 type Rendered = { pixels: Buffer; width: number; height: number };
@@ -394,32 +394,40 @@ function bounds({ width: w, height: h, data: d }: Img) {
 
 // ─── Framing ────────────────────────────────────────────────────────────────
 
+type Kind = "mascot" | "peek" | "walk";
+type Box = { x: number; y: number; width: number; height: number };
+
+/** Clears the faint haze some generators leave around a transparent drawing, so it can't widen the crop. */
+function clearHaze({ data: d }: Img) {
+  for (let i = 3; i < d.length; i += 4) if (d[i] < 48) d[i] = 0;
+}
+
+function union(boxes: Box[]): Box {
+  const x0 = Math.min(...boxes.map((b) => b.x));
+  const y0 = Math.min(...boxes.map((b) => b.y));
+  const x1 = Math.max(...boxes.map((b) => b.x + b.width));
+  const y1 = Math.max(...boxes.map((b) => b.y + b.height));
+  return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
+}
+
 /**
- * Crops to the drawing and fits it into the standard frame:
+ * Crops `box` out of the drawing and fits it into the standard frame:
  * moods — 1024², ~80% of the height, bottom on the ground line at 93%, centred;
- * peek heads — 1200×960, right-aligned (the neck leaves the right edge), centred vertically.
+ * peek — the upper body popping up: bottom flush with the frame's bottom edge, centred;
+ * walk — full body mid-step: feet on the ground line at 96%, centred.
+ * Peek poses and walk frames are cropped with one shared box per set, so swapping them never jumps.
  */
-function frame(img: Img, kind: "mascot" | "peek"): Img {
-  const box = bounds(img);
-  if (!box) throw new Error("nothing left after removing the background");
+function frame(img: Img, box: Box, kind: Kind): Img {
   const crop: Img = { width: box.width, height: box.height, data: new Uint8ClampedArray(box.width * box.height * 4) };
   for (let y = 0; y < box.height; y++) {
     const from = ((box.y + y) * img.width + box.x) * 4;
     crop.data.set(img.data.subarray(from, from + box.width * 4), y * box.width * 4);
   }
-  const { width: W, height: H } = kind === "mascot" ? ART_SPEC.mascot : ART_SPEC.peek;
-  let scale: number;
-  let x: number;
-  let y: number;
-  if (kind === "mascot") {
-    scale = Math.min((0.8 * H) / box.height, (0.92 * W) / box.width);
-    x = (W - box.width * scale) / 2;
-    y = 0.93 * H - box.height * scale;
-  } else {
-    scale = Math.min((0.86 * H) / box.height, W / box.width);
-    x = W - box.width * scale;
-    y = (H - box.height * scale) / 2;
-  }
+  const { width: W, height: H } = ART_SPEC[kind];
+  const fit = { mascot: [0.8, 0.92, 0.93], peek: [0.97, 0.96, 1], walk: [0.86, 0.94, 0.96] }[kind];
+  const scale = Math.min((fit[0] * H) / box.height, (fit[1] * W) / box.width);
+  const x = (W - box.width * scale) / 2;
+  const y = fit[2] * H - box.height * scale;
   const href = `data:image/png;base64,${encodePng(crop).toString("base64")}`;
   return renderSvg(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><image href="${href}" x="${x}" y="${y}" width="${box.width * scale}" height="${box.height * scale}"/></svg>`,
@@ -428,47 +436,76 @@ function frame(img: Img, kind: "mascot" | "peek"): Img {
 
 // ─── Run ────────────────────────────────────────────────────────────────────
 
-const jobs: { raw: URL; out: URL; label: string; kind: "mascot" | "peek" }[] = [];
+const FOLDERS: Record<string, { kind: Kind; names: readonly string[] }> = {
+  [MOOD_FOLDER]: { kind: "mascot", names: MOODS },
+  [PEEK_FOLDER]: { kind: "peek", names: PEEK_POSES },
+  [WALK_FOLDER]: { kind: "walk", names: WALK_FRAMES },
+};
+
+type Job = { raw: URL; out: URL; label: string; kind: Kind; folder: string };
+const jobs: Job[] = [];
 if (!fs.existsSync(rawDir)) fs.mkdirSync(rawDir, { recursive: true });
 for (const folder of fs.readdirSync(rawDir, { withFileTypes: true }).filter((e) => e.isDirectory())) {
-  const isPeek = folder.name === PEEK_FOLDER;
-  if (!isPeek && !SPECIES.some((s) => s.value === folder.name)) {
+  const spec = FOLDERS[folder.name];
+  if (!spec) {
     console.log(`! docs/mascot-art/raw/${folder.name}/: unknown folder — skipped`);
     continue;
   }
-  const names: readonly string[] = isPeek ? PEEK_POSES : MOODS;
   for (const entry of fs.readdirSync(new URL(`${folder.name}/`, rawDir))) {
     if (entry.startsWith(".")) continue;
     const name = entry.replace(/\.(png|jpe?g|webp)$/i, "");
-    if (name === entry || !names.includes(name)) {
-      console.log(`! docs/mascot-art/raw/${folder.name}/${entry}: unknown name — use ${names.join(", ")} (.png, .jpg or .webp)`);
+    if (name === entry || !spec.names.includes(name)) {
+      console.log(`! docs/mascot-art/raw/${folder.name}/${entry}: unknown name — use ${spec.names.join(", ")} (.png, .jpg or .webp)`);
       continue;
     }
     jobs.push({
       raw: new URL(`${folder.name}/${entry}`, rawDir),
       out: new URL(`${folder.name}/${name}.png`, artDir),
       label: `${folder.name}/${name}`,
-      kind: isPeek ? "peek" : "mascot",
+      kind: spec.kind,
+      folder: folder.name,
     });
   }
 }
 
+// 1. Cut out every image.
+type Prepared = { job: Job; img: Img; box: Box; background: string };
+const prepared: Prepared[] = [];
 if (jobs.length === 0) console.log("No raw images in docs/mascot-art/raw/ yet.");
 for (const job of jobs) {
   try {
     const img = decode(job.raw);
     const { removed, colours } = removeBackground(img);
+    // Only the animated sets: re-running must not change the approved moods.
+    if (job.kind !== "mascot") clearHaze(img);
     dropSpecks(img);
     // Sticker edge ≈ 1.4% of the drawing's size, like the references.
-    const box = bounds(img);
-    addStickerEdge(img, Math.max(6, Math.round(0.014 * Math.max(box?.width ?? 0, box?.height ?? 0))));
-    const png = encodePng(frame(img, job.kind));
-    fs.mkdirSync(new URL(".", job.out), { recursive: true });
-    fs.writeFileSync(job.out, png);
+    const drawn = bounds(img);
+    if (!drawn) throw new Error("nothing left after removing the background");
+    addStickerEdge(img, Math.max(6, Math.round(0.014 * Math.max(drawn.width, drawn.height))));
+    const box = bounds(img)!;
     const background = colours.length ? `removed ${Math.round(removed * 100)}% background (${colours.join(", ")})` : "no background found";
-    const weight = `${Math.round(png.length / 1024)} KB${png.length > ART_SPEC.maxBytes ? ` — larger than the ${ART_SPEC.maxBytes / 1024} KB target` : ""}`;
-    console.log(`✓ ${job.label}: ${background} → ${job.kind === "mascot" ? "1024×1024" : "1200×960"}, ${weight}`);
+    prepared.push({ job, img, box, background });
   } catch (error) {
     console.log(`✗ ${job.label}: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+// 2. Sets that animate together share one crop box (they come from edits of one image, so same canvas size).
+const sharedBox = new Map<string, Box>();
+for (const folder of new Set(prepared.filter((p) => p.job.kind !== "mascot").map((p) => p.job.folder))) {
+  const members = prepared.filter((p) => p.job.folder === folder);
+  const sizes = new Set(members.map((p) => `${p.img.width}x${p.img.height}`));
+  if (sizes.size > 1) console.log(`! ${folder}: images have different sizes (${[...sizes].join(", ")}) — they may jump when swapped`);
+  else sharedBox.set(folder, union(members.map((p) => p.box)));
+}
+
+// 3. Frame and save.
+for (const { job, img, box, background } of prepared) {
+  const png = encodePng(frame(img, sharedBox.get(job.folder) ?? box, job.kind));
+  fs.mkdirSync(new URL(".", job.out), { recursive: true });
+  fs.writeFileSync(job.out, png);
+  const { width: W, height: H } = ART_SPEC[job.kind];
+  const weight = `${Math.round(png.length / 1024)} KB${png.length > ART_SPEC.maxBytes ? ` — larger than the ${ART_SPEC.maxBytes / 1024} KB target` : ""}`;
+  console.log(`✓ ${job.label}: ${background} → ${W}×${H}, ${weight}`);
 }

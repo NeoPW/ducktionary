@@ -3,9 +3,9 @@ import { StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/app-text";
 import { Card } from "@/components/card";
-import { DuckMascot } from "@/components/duck-mascot";
 import { EmptyScreen } from "@/components/empty-state";
 import { DateField } from "@/components/form/date-field";
+import { GooseMascot } from "@/components/goose-mascot";
 import { PeriodStepper } from "@/components/period-stepper";
 import { LoadingScreen, Screen } from "@/components/screen";
 import { SegmentedControl } from "@/components/segmented-control";
@@ -145,7 +145,7 @@ function Hero({ summary, range }: { summary: Summary; range: StatsRange }) {
 
   return (
     <Card style={styles.hero}>
-      <DuckMascot mood={summary.books > 0 ? "reading" : "sleepy"} size={88} />
+      <GooseMascot mood={summary.books > 0 ? "reading" : "sleepy"} size={88} />
       <View style={styles.flex}>
         <AppText style={styles.heroNumber} accessibilityLabel={`${plural(summary.books, BOOKS)} finished ${when}`}>
           {summary.books.toLocaleString()}

@@ -6,8 +6,8 @@ import { sortResults, type SearchResult, type SearchSort } from "@/api/search-re
 import { AppText } from "@/components/app-text";
 import { BookCover } from "@/components/book-cover";
 import { Button } from "@/components/button";
-import { DuckMascot } from "@/components/duck-mascot";
 import { EmptyState } from "@/components/empty-state";
+import { GooseMascot } from "@/components/goose-mascot";
 import { Screen } from "@/components/screen";
 import { SearchField } from "@/components/search-field";
 import { SegmentedControl } from "@/components/segmented-control";
@@ -55,7 +55,7 @@ export default function AddScreen() {
     <View style={styles.header}>
       {search.status === "idle" && (
         <View style={styles.hero}>
-          <DuckMascot mood="scanning" size={96} />
+          <GooseMascot mood="scanning" size={96} />
           <AppText color="muted" style={styles.flex}>
             Scan the barcode on the back cover, or search by title, author or ISBN.
           </AppText>

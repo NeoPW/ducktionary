@@ -7,7 +7,7 @@ import { AppText } from "@/components/app-text";
 import { BookForm } from "@/components/book-form";
 import { Card } from "@/components/card";
 import { useConfirm } from "@/components/confirm-dialog";
-import { DuckMascot } from "@/components/duck-mascot";
+import { GooseMascot } from "@/components/goose-mascot";
 import { useToast } from "@/components/toast";
 import { hasIsbn, insertBook } from "@/db/books";
 import { useCategories } from "@/hooks/use-books";
@@ -62,7 +62,7 @@ export default function ConfirmBookScreen() {
       notice={
         duplicate || notFound ? (
           <Card style={[styles.notice, { borderColor: colors.accent }]}>
-            <DuckMascot mood="confused" size={48} />
+            <GooseMascot mood="confused" size={48} />
             <AppText variant="label" style={styles.noticeText}>
               {duplicate
                 ? "You've already logged this book. Saving will add it a second time."

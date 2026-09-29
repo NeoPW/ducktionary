@@ -43,16 +43,17 @@ npm run supabase:check      # attack-test the backup server (after setting it up
 
 ## Mascots
 
-The mascots (a goose and a few ducklings) are drawn in code in `src/components/mascot/shapes.ts` and are being
-replaced by drawn images — **work in progress**, see `docs/mascot-art-brief.md` for the prompts and status.
+The mascot is a drawn white goose: five moods for the app's screens, plus pop-up poses and waddle frames for the
+goose visits. The images live in `assets/mascots/`; how they are made is in `docs/mascot-art-brief.md`.
 
 ```bash
+npm run mascots:generate  # draw one image with the OpenAI API (dry run unless --go; see the brief)
 npm run mascots:process   # raw images in docs/mascot-art/raw/ → app-ready images in assets/mascots/
 npm run mascots           # check the images, register them for the app, build docs/mascot-gallery.html
 npm run mascots:icons     # rebuild the app icons from the goose
 ```
 
-Open `docs/mascot-gallery.html` in a browser to see every character, mood and goose visit.
+Open `docs/mascot-gallery.html` in a browser to see every image, a demo of the goose visits and the app icons.
 
 ## Where things are
 

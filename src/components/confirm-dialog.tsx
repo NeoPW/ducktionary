@@ -3,7 +3,8 @@ import { Modal, Pressable, StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/app-text";
 import { Button } from "@/components/button";
-import { DuckMascot, type DuckMood } from "@/components/duck-mascot";
+import { GooseMascot } from "@/components/goose-mascot";
+import type { Mood } from "@/components/mascot/art";
 import { radii, spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
 
@@ -14,7 +15,7 @@ export type ConfirmOptions = {
   cancelText?: string;
   /** Styles the confirm button as destructive (red). */
   destructive?: boolean;
-  mood?: DuckMood;
+  mood?: Mood;
 };
 
 type Ask = (options: ConfirmOptions) => Promise<boolean>;
@@ -62,7 +63,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               onStartShouldSetResponder={() => true}
               accessibilityViewIsModal
             >
-              <DuckMascot mood={pending.mood ?? (pending.destructive ? "confused" : "reading")} size={72} />
+              <GooseMascot mood={pending.mood ?? (pending.destructive ? "confused" : "reading")} size={72} />
               <AppText variant="title" style={styles.center} accessibilityRole="header">
                 {pending.title}
               </AppText>

@@ -8,8 +8,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { findByIsbn } from "@/api/book-lookup";
 import { AppText } from "@/components/app-text";
 import { Button } from "@/components/button";
-import { DuckMascot } from "@/components/duck-mascot";
 import { EmptyScreen } from "@/components/empty-state";
+import { GooseMascot } from "@/components/goose-mascot";
 import { radii, spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
 import type { BookDraft } from "@/types";
@@ -137,7 +137,7 @@ function Scanner() {
 
         <View style={styles.middle} pointerEvents="none">
           <View style={[styles.duck, { width: frameWidth }]}>
-            <DuckMascot mood="scanning" size={72} />
+            <GooseMascot mood="scanning" size={72} />
           </View>
           <View
             style={[

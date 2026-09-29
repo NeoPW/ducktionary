@@ -4,12 +4,13 @@ import Animated, { FadeInUp, FadeOutUp } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText } from "@/components/app-text";
-import { DuckMascot, type DuckMood } from "@/components/duck-mascot";
+import { GooseMascot } from "@/components/goose-mascot";
+import type { Mood } from "@/components/mascot/art";
 import { radii, spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
 
-type Toast = { id: number; text: string; mood: DuckMood };
-type ShowToast = (text: string, mood?: DuckMood) => void;
+type Toast = { id: number; text: string; mood: Mood };
+type ShowToast = (text: string, mood?: Mood) => void;
 
 const DURATION_MS = 2600;
 const ToastContext = createContext<ShowToast>(() => {});
@@ -46,7 +47,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             exiting={FadeOutUp.duration(180)}
             style={[styles.toast, { backgroundColor: colors.surface, borderColor: colors.accent }]}
           >
-            <DuckMascot mood={toast.mood} size={40} />
+            <GooseMascot mood={toast.mood} size={40} />
             <AppText variant="label" style={styles.text} numberOfLines={2}>
               {toast.text}
             </AppText>

@@ -55,7 +55,8 @@
     "mascots:sync": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/mascot-sync.ts",
     "mascots:process": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/mascot-process.ts && npm run mascots",
     "supabase:check": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/supabase-security-check.ts",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "mascots:generate": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/mascot-generate.ts"
   },
   "private": true
 }

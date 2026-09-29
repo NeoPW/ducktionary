@@ -5,8 +5,18 @@
 import fs from "node:fs";
 import zlib from "node:zlib";
 
-import { ART_SPEC, PEEK_FOLDER, PEEK_POSES, type PeekPose } from "../src/components/mascot/art.ts";
-import { MOODS, SPECIES, type Mood, type Species } from "../src/components/mascot/shapes.ts";
+import {
+  ART_SPEC,
+  MOOD_FOLDER,
+  MOODS,
+  PEEK_FOLDER,
+  PEEK_POSES,
+  WALK_FOLDER,
+  WALK_FRAMES,
+  type Mood,
+  type PeekPose,
+  type WalkFrame,
+} from "../src/components/mascot/art.ts";
 
 export const root = new URL("..", import.meta.url);
 export const artDir = new URL("assets/mascots/", root);
@@ -29,10 +39,11 @@ export type ArtFile = {
 export const isUsable = (file: ArtFile) => file.hasAlpha && file.cornersClear !== false;
 
 export type ArtScan = {
-  mascots: Partial<Record<Species, Partial<Record<Mood, ArtFile>>>>;
+  moods: Partial<Record<Mood, ArtFile>>;
   peek: Partial<Record<PeekPose, ArtFile>>;
+  walk: Partial<Record<WalkFrame, ArtFile>>;
   warnings: string[];
-  /** Everything round one still needs (the goose), as repo-relative paths. */
+  /** Every image still to draw, as repo-relative paths. */
   missing: string[];
 };
 
@@ -119,18 +130,25 @@ function check(path: string, info: Omit<ArtFile, "path">, spec: { width: number;
   }
 }
 
+/** The three image sets: which folder, which names, which frame size. */
+export const ART_SETS = [
+  { key: "moods", folder: MOOD_FOLDER, names: MOODS, spec: ART_SPEC.mascot },
+  { key: "peek", folder: PEEK_FOLDER, names: PEEK_POSES, spec: ART_SPEC.peek },
+  { key: "walk", folder: WALK_FOLDER, names: WALK_FRAMES, spec: ART_SPEC.walk },
+] as const;
+
 export function scanArt(): ArtScan {
-  const scan: ArtScan = { mascots: {}, peek: {}, warnings: [], missing: [] };
+  const scan: ArtScan = { moods: {}, peek: {}, walk: {}, warnings: [], missing: [] };
   if (!fs.existsSync(artDir)) fs.mkdirSync(artDir, { recursive: true });
 
   const folders = fs.readdirSync(artDir, { withFileTypes: true }).filter((d) => d.isDirectory());
   for (const folder of folders) {
-    const isPeek = folder.name === PEEK_FOLDER;
-    const species = SPECIES.find((s) => s.value === folder.name)?.value;
-    if (!isPeek && !species) {
-      scan.warnings.push(`assets/mascots/${folder.name}/: unknown folder — use one of ${[...SPECIES.map((s) => s.value), PEEK_FOLDER].join(", ")}.`);
+    const set = ART_SETS.find((s) => s.folder === folder.name);
+    if (!set) {
+      scan.warnings.push(`assets/mascots/${folder.name}/: unknown folder — use one of ${ART_SETS.map((s) => s.folder).join(", ")}.`);
       continue;
     }
+    const names: readonly string[] = set.names;
     for (const entry of fs.readdirSync(new URL(`${folder.name}/`, artDir))) {
       if (entry.startsWith(".")) continue;
       const path = `assets/mascots/${folder.name}/${entry}`;
@@ -139,9 +157,8 @@ export function scanArt(): ArtScan {
         scan.warnings.push(`${path}: not a PNG — export as .png with a transparent background.`);
         continue;
       }
-      const known = isPeek ? (PEEK_POSES as readonly string[]).includes(name) : (MOODS as readonly string[]).includes(name);
-      if (!known) {
-        scan.warnings.push(`${path}: unknown name — use ${(isPeek ? PEEK_POSES : MOODS).map((n) => `${n}.png`).join(", ")}.`);
+      if (!names.includes(name)) {
+        scan.warnings.push(`${path}: unknown name — use ${names.map((n) => `${n}.png`).join(", ")}.`);
         continue;
       }
       const info = readPng(new URL(path, root));
@@ -149,15 +166,16 @@ export function scanArt(): ArtScan {
         scan.warnings.push(`${path}: not a valid PNG file.`);
         continue;
       }
-      const file = { path, ...info };
-      check(path, info, isPeek ? ART_SPEC.peek : ART_SPEC.mascot, scan.warnings);
-      if (isPeek) scan.peek[name as PeekPose] = file;
-      else (scan.mascots[species!] ??= {})[name as Mood] = file;
+      check(path, info, set.spec, scan.warnings);
+      (scan[set.key] as Record<string, ArtFile>)[name] = { path, ...info };
     }
   }
 
-  for (const mood of MOODS) if (!scan.mascots.goose?.[mood]) scan.missing.push(`assets/mascots/goose/${mood}.png`);
-  for (const pose of PEEK_POSES) if (!scan.peek[pose]) scan.missing.push(`assets/mascots/${PEEK_FOLDER}/${pose}.png`);
+  for (const set of ART_SETS) {
+    for (const name of set.names) {
+      if (!(scan[set.key] as Record<string, ArtFile>)[name]) scan.missing.push(`assets/mascots/${set.folder}/${name}.png`);
+    }
+  }
   return scan;
 }
 

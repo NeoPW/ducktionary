@@ -9,19 +9,11 @@
  * cross-account checks, also set two real test accounts there (they are only used by this script):
  *   SECURITY_CHECK_A_EMAIL, SECURITY_CHECK_A_PASSWORD, SECURITY_CHECK_B_EMAIL, SECURITY_CHECK_B_PASSWORD
  */
-import fs from "node:fs";
-
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-const root = new URL("..", import.meta.url);
-const env: Record<string, string> = { ...(process.env as Record<string, string>) };
-const envFile = new URL(".env.local", root);
-if (fs.existsSync(envFile)) {
-  for (const line of fs.readFileSync(envFile, "utf8").split("\n")) {
-    const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
-    if (match) env[match[1]] ??= match[2].replace(/^["']|["']$/g, "");
-  }
-}
+import { loadEnv } from "./env.ts";
+
+const env = loadEnv();
 
 const url = env.EXPO_PUBLIC_SUPABASE_URL;
 const key = env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -70,11 +62,13 @@ const anon = client();
 }
 
 // ─── Between two real accounts ────────────────────────────────────────────
+type Account = { email: string; password: string };
 const accounts = ["A", "B"].map((who) => ({ email: env[`SECURITY_CHECK_${who}_EMAIL`], password: env[`SECURITY_CHECK_${who}_PASSWORD`] }));
-if (accounts.some((a) => !a.email || !a.password)) {
+const complete = (a: Partial<Account>): a is Account => Boolean(a.email && a.password);
+if (!accounts.every(complete)) {
   console.log("\n(Skipping cross-account checks — set SECURITY_CHECK_A_* and SECURITY_CHECK_B_* in .env.local to run them.)");
 } else {
-  const signIn = async ({ email, password }: { email: string; password: string }): Promise<[SupabaseClient, string]> => {
+  const signIn = async ({ email, password }: Account): Promise<[SupabaseClient, string]> => {
     const c = client();
     const { data, error } = await c.auth.signInWithPassword({ email, password });
     if (error || !data.user) throw new Error(`could not sign in as ${email}: ${error?.message}`);

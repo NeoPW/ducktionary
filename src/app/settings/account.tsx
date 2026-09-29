@@ -4,8 +4,8 @@ import { StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/app-text";
 import { Button } from "@/components/button";
-import { DuckMascot } from "@/components/duck-mascot";
 import { TextField } from "@/components/form/text-field";
+import { GooseMascot } from "@/components/goose-mascot";
 import { Screen } from "@/components/screen";
 import { useToast } from "@/components/toast";
 import { useBackup } from "@/sync/backup-provider";
@@ -42,7 +42,7 @@ function SignIn() {
   return (
     <Screen>
       <View style={styles.hero}>
-        <DuckMascot species="goose" mood="scanning" size={88} />
+        <GooseMascot mood="scanning" size={88} />
         <AppText color="muted" style={styles.flex}>
           Sign in to back up your library automatically and restore it on a new phone.
         </AppText>
