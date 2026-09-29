@@ -1,7 +1,7 @@
 import { useSQLiteContext } from "expo-sqlite";
 import { useCallback } from "react";
 
-import { getBook, listBooks, listCategories } from "@/db/books";
+import { getBook, listBooks, listCategories, listSeries } from "@/db/books";
 import { useFocusLoader } from "@/hooks/use-focus-loader";
 
 export function useBooks() {
@@ -20,5 +20,12 @@ export function useBook(id: number) {
 export function useCategories() {
   const db = useSQLiteContext();
   const load = useCallback(() => listCategories(db), [db]);
+  return useFocusLoader(load);
+}
+
+/** Series names in use, most books first — suggestions for the book form. */
+export function useSeriesNames() {
+  const db = useSQLiteContext();
+  const load = useCallback(() => listSeries(db), [db]);
   return useFocusLoader(load);
 }

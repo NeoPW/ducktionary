@@ -47,6 +47,16 @@ const migrations: string[] = [
   ALTER TABLE books ADD COLUMN format TEXT;
   ALTER TABLE books ADD COLUMN acquisition TEXT;
   `,
+  // v4: series — books that belong together, with their number in the series (2.5 for a novella in between).
+  `
+  CREATE TABLE series (
+    id   INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE COLLATE NOCASE
+  );
+  ALTER TABLE books ADD COLUMN series_id INTEGER REFERENCES series (id) ON DELETE SET NULL;
+  ALTER TABLE books ADD COLUMN series_position REAL;
+  CREATE INDEX books_series ON books (series_id);
+  `,
 ];
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase) {

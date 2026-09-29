@@ -16,6 +16,7 @@ export function blankDraft(today: IsoDate, prefill: Partial<BookDraft> = {}): Bo
     priceCents: null,
     format: null,
     acquisition: null,
+    series: null,
     ...prefill,
   };
 }

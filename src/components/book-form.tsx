@@ -7,11 +7,12 @@ import { AppText } from "@/components/app-text";
 import { BookCover } from "@/components/book-cover";
 import { Button } from "@/components/button";
 import { useConfirm } from "@/components/confirm-dialog";
+import { Dropdown } from "@/components/dropdown";
 import { ChipInput } from "@/components/form/chip-input";
 import { ChoiceChips } from "@/components/form/choice-chips";
 import { DateField } from "@/components/form/date-field";
 import { RatingField } from "@/components/form/rating-field";
-import { TextField } from "@/components/form/text-field";
+import { FieldShell, TextField } from "@/components/form/text-field";
 import { spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
 import type { BookDraft } from "@/types";
@@ -29,11 +30,20 @@ type BookFormProps = {
    */
   onSubmit: (draft: BookDraft) => Promise<(() => void) | undefined>;
   categorySuggestions?: string[];
+  /** Series already in the library, offered while typing a series name. */
+  seriesSuggestions?: string[];
   /** Optional content above the form, e.g. a duplicate warning. */
   notice?: React.ReactNode;
 };
 
-export function BookForm({ initial, submitLabel, onSubmit, categorySuggestions, notice }: BookFormProps) {
+export function BookForm({
+  initial,
+  submitLabel,
+  onSubmit,
+  categorySuggestions,
+  seriesSuggestions = [],
+  notice,
+}: BookFormProps) {
   const { colors } = useTheme();
   const headerHeight = useHeaderHeight();
   const navigation = useNavigation();
@@ -151,6 +161,14 @@ export function BookForm({ initial, submitLabel, onSubmit, categorySuggestions, 
           placeholder="Add a category and press enter"
           suggestions={categorySuggestions}
         />
+        <SeriesPicker
+          value={form.series}
+          names={seriesSuggestions}
+          onChange={(name) => update("series", name)}
+          position={form.seriesPosition}
+          onPositionChange={(text) => update("seriesPosition", text)}
+          positionError={errors.seriesPosition}
+        />
         <TextField
           label="Comments & notes"
           value={form.comment}
@@ -215,8 +233,83 @@ export function BookForm({ initial, submitLabel, onSubmit, categorySuggestions, 
   );
 }
 
+const NO_SERIES = "";
+const NEW_SERIES = "__new";
+
+/**
+ * Series: a dropdown of the series already in the library, plus "New series…" which asks for a name. The number
+ * in the series sits next to it.
+ */
+function SeriesPicker({
+  value,
+  names,
+  onChange,
+  position,
+  onPositionChange,
+  positionError,
+}: {
+  value: string;
+  names: string[];
+  onChange: (name: string) => void;
+  position: string;
+  onPositionChange: (text: string) => void;
+  positionError?: string;
+}) {
+  const [creating, setCreating] = useState(false);
+  const known = names.find((name) => name.toLowerCase() === value.trim().toLowerCase());
+  // A name that isn't in the list (yet) is being typed as a new series.
+  const typingNew = creating || (value.trim() !== "" && !known);
+  const options = [
+    { value: NO_SERIES, label: "No series" },
+    ...names.map((name) => ({ value: name, label: name })),
+    { value: NEW_SERIES, label: "New series…" },
+  ];
+
+  return (
+    <View style={styles.seriesBlock}>
+      <View style={styles.row}>
+        <View style={styles.isbn}>
+          <FieldShell label="Series">
+            <Dropdown
+              compact
+              accessibilityLabel="Series"
+              value={typingNew ? NEW_SERIES : (known ?? NO_SERIES)}
+              options={options}
+              onChange={(picked) => {
+                setCreating(picked === NEW_SERIES);
+                onChange(picked === NEW_SERIES ? "" : picked);
+              }}
+            />
+          </FieldShell>
+        </View>
+        <View style={styles.flex}>
+          <TextField
+            label="No."
+            value={position}
+            onChangeText={onPositionChange}
+            error={positionError}
+            keyboardType="decimal-pad"
+            placeholder="1"
+          />
+        </View>
+      </View>
+      {typingNew && (
+        <TextField
+          label="New series name"
+          value={value}
+          onChangeText={onChange}
+          placeholder="Mistborn"
+          autoCapitalize="words"
+          autoFocus={creating}
+        />
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  seriesBlock: { gap: spacing.md },
   content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxl },
   hero: { flexDirection: "row", gap: spacing.lg, alignItems: "center" },
   heroText: { flex: 1, gap: spacing.xs },

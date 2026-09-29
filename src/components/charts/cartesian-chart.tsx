@@ -25,6 +25,8 @@ type CartesianChartProps = {
   formatShort?: (value: number) => string;
   /** Exact value for the detail line; when given, the unit words are left out (e.g. "12,99 €"). */
   formatFull?: (value: number) => string;
+  /** Opens the books behind the selected column ("Show these books" under the chart). */
+  onOpen?: (bar: Bar) => void;
 };
 
 /**
@@ -38,6 +40,7 @@ export function CartesianChart({
   accessibilityLabel,
   formatShort = formatCount,
   formatFull,
+  onOpen,
 }: CartesianChartProps) {
   const { colors } = useTheme();
   const [width, setWidth] = useState(0);
@@ -188,6 +191,13 @@ export function CartesianChart({
           : "Nothing to show yet."}
         {activeBar && selected < 0 ? ` (highest) · tap a ${variant === "bar" ? "column" : "point"} for others` : ""}
       </AppText>
+      {onOpen && activeBar?.filter && activeBar.value > 0 && (
+        <Pressable accessibilityRole="button" hitSlop={8} onPress={() => onOpen(activeBar)} style={styles.open}>
+          <AppText variant="label" color="primary">
+            Show these books ›
+          </AppText>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -222,4 +232,5 @@ const styles = StyleSheet.create({
   hitRow: { flexDirection: "row", bottom: 0 },
   hit: { flex: 1 },
   detail: { marginTop: spacing.xs },
+  open: { marginTop: spacing.xs, alignSelf: "flex-start" },
 });

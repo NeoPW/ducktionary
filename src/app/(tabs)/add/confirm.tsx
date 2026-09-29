@@ -10,7 +10,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { Mascot } from "@/components/mascot";
 import { useToast } from "@/components/toast";
 import { hasIsbn, insertBook } from "@/db/books";
-import { useCategories } from "@/hooks/use-books";
+import { useCategories, useSeriesNames } from "@/hooks/use-books";
 import { spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
 import type { BookDraft } from "@/types";
@@ -26,6 +26,7 @@ export default function ConfirmBookScreen() {
   const [duplicate, setDuplicate] = useState(false);
 
   const categories = useCategories();
+  const seriesNames = useSeriesNames();
 
   useEffect(() => {
     if (!initial.isbn) return;
@@ -59,6 +60,7 @@ export default function ConfirmBookScreen() {
       submitLabel="Add to library"
       onSubmit={save}
       categorySuggestions={categories.data ?? []}
+      seriesSuggestions={seriesNames.data ?? []}
       notice={
         duplicate || notFound ? (
           <Card style={[styles.notice, { borderColor: colors.accent }]}>

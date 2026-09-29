@@ -61,6 +61,7 @@ Open `docs/mascot-gallery.html` in a browser to see every image, a demo of the g
 - `src/app/` — screens (Expo Router): library, add/scan, stats, settings
 - `src/db/` — on-device SQLite (books, migrations, sample data)
 - `src/api/` — Open Library and Google Books lookups
+- `src/library/` — library filter (also what stats bars link to) and series sizes
 - `src/stats/` — stats and chart data
 - `src/theme/` — colour schemes and tokens
 - `src/storage/` — on-device settings (kv-store) and the list of setting keys

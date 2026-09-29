@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
@@ -9,7 +10,8 @@ import { RowChart } from "@/components/charts/row-chart";
 import { Dropdown } from "@/components/dropdown";
 import { SegmentedControl } from "@/components/segmented-control";
 import { usePreference } from "@/hooks/use-preference";
-import { buildChart, CHARTS, type ChartKind, type ChartStyle } from "@/stats/charts";
+import { encodeFilter } from "@/library/filter";
+import { buildChart, CHARTS, type Bar, type ChartKind, type ChartStyle } from "@/stats/charts";
 import type { DateSpan } from "@/stats/range";
 import { SETTING_KEYS } from "@/storage/keys";
 import { spacing } from "@/theme/tokens";
@@ -41,6 +43,14 @@ export function ChartSection({ books, span, library }: ChartSectionProps) {
   const [showTable, setShowTable] = useState(false);
 
   const chart = buildChart(kind, books, span, library);
+  // Tapping a bar opens exactly its books: the bar's filter, limited to the stats period.
+  const openBar = (bar: Bar) => {
+    if (!bar.filter) return;
+    const own = bar.filter.finished;
+    const from = own?.from && own.from > span.from ? own.from : span.from;
+    const to = own?.to && own.to < span.to ? own.to : span.to;
+    router.navigate({ pathname: "/", params: { filter: encodeFilter({ ...bar.filter, finished: { from, to } }) } });
+  };
   // Keep the user's preferred style where it fits this chart; otherwise fall back to bars.
   const style: ChartStyle = chart.styles.includes(preferredStyle) ? preferredStyle : "bar";
   const title = CHARTS.find((c) => c.kind === kind)?.label ?? "";
@@ -74,9 +84,9 @@ export function ChartSection({ books, span, library }: ChartSectionProps) {
             Nothing to chart for this period.
           </AppText>
         ) : style === "pie" && chart.slices ? (
-          <PieChart slices={chart.slices} unit={chart.unit} accessibilityLabel={summary} />
+          <PieChart slices={chart.slices} unit={chart.unit} accessibilityLabel={summary} onOpen={openBar} />
         ) : chart.layout === "rows" ? (
-          <RowChart bars={chart.bars} />
+          <RowChart bars={chart.bars} onOpen={openBar} />
         ) : (
           <>
             <CartesianChart
@@ -88,6 +98,7 @@ export function ChartSection({ books, span, library }: ChartSectionProps) {
               accessibilityLabel={summary}
               formatShort={currency ? (v) => euros(v, true) : undefined}
               formatFull={currency ? euros : undefined}
+              onOpen={openBar}
             />
             <Pressable accessibilityRole="button" hitSlop={8} onPress={() => setShowTable((v) => !v)}>
               <AppText variant="label" color="primary">

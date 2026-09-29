@@ -19,10 +19,13 @@ export type BookFormState = {
   price: string;
   format: BookFormat | null;
   acquisition: Acquisition | null;
+  /** Series name and its number, both as typed. */
+  series: string;
+  seriesPosition: string;
 };
 
 export type BookFormErrors = Partial<
-  Record<"title" | "isbn" | "pages" | "startedAt" | "finishedAt" | "price", string>
+  Record<"title" | "isbn" | "pages" | "startedAt" | "finishedAt" | "price" | "seriesPosition", string>
 >;
 
 export function draftToForm(draft: BookDraft): BookFormState {
@@ -41,6 +44,8 @@ export function draftToForm(draft: BookDraft): BookFormState {
     price: draft.priceCents != null ? formatPrice(draft.priceCents).replace(/[^\d.,]/g, "") : "",
     format: draft.format,
     acquisition: draft.acquisition,
+    series: draft.series?.name ?? "",
+    seriesPosition: draft.series?.position != null ? String(draft.series.position).replace(".", ",") : "",
   };
 }
 
@@ -73,6 +78,14 @@ export function formToDraft(
     errors.price = "Use a price like 12,99.";
   }
 
+  // The number in the series: optional, positive, whole or with a decimal ("2,5" for a novella in between).
+  const seriesName = form.series.trim();
+  const positionText = form.seriesPosition.trim().replace(",", ".");
+  const seriesPosition = positionText ? Number(positionText) : null;
+  if (seriesPosition != null && (!/^\d+(\.\d+)?$/.test(positionText) || seriesPosition <= 0 || seriesPosition > 999)) {
+    errors.seriesPosition = "Use a number like 2.";
+  }
+
   if (form.startedAt && form.startedAt > today) {
     errors.startedAt = "That's in the future.";
   } else if (form.startedAt && form.finishedAt && form.startedAt > form.finishedAt) {
@@ -97,6 +110,7 @@ export function formToDraft(
       priceCents,
       format: form.format,
       acquisition: form.acquisition,
+      series: seriesName ? { name: seriesName, position: seriesPosition } : null,
     },
   };
 }

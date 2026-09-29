@@ -1,4 +1,4 @@
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/app-text";
 import type { Bar } from "@/stats/charts";
@@ -7,19 +7,25 @@ import { useTheme } from "@/theme/use-theme";
 
 const BAR_THICKNESS = 14;
 
-/** Ranked horizontal bars with the value at each tip — every value is readable without tapping. */
-export function RowChart({ bars }: { bars: Bar[] }) {
+/**
+ * Ranked horizontal bars with the value at each tip — every value is readable without tapping. Rows with books
+ * behind them open those books when `onOpen` is given.
+ */
+export function RowChart({ bars, onOpen }: { bars: Bar[]; onOpen?: (bar: Bar) => void }) {
   const { colors } = useTheme();
   const max = Math.max(1, ...bars.map((b) => b.value));
 
   return (
     <View style={styles.list}>
       {bars.map((bar) => (
-        <View
+        <Pressable
           key={bar.key}
           style={styles.row}
-          accessible
+          disabled={!onOpen || !bar.filter || bar.value === 0}
+          onPress={() => onOpen?.(bar)}
+          accessibilityRole={onOpen && bar.filter ? "button" : undefined}
           accessibilityLabel={`${bar.label}: ${bar.value}`}
+          accessibilityHint={onOpen && bar.filter ? "Shows these books in your library" : undefined}
         >
           <AppText variant="label" numberOfLines={1} style={styles.label}>
             {bar.label}
@@ -36,7 +42,10 @@ export function RowChart({ bars }: { bars: Bar[] }) {
               {bar.value.toLocaleString()}
             </AppText>
           </View>
-        </View>
+          <AppText variant="label" color="muted" style={styles.chevron}>
+            {onOpen && bar.filter && bar.value > 0 ? "›" : ""}
+          </AppText>
+        </Pressable>
       ))}
     </View>
   );
@@ -53,4 +62,5 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 4,
   },
   value: { marginLeft: spacing.xs },
+  chevron: { width: 10 },
 });

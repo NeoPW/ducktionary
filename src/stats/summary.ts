@@ -1,3 +1,4 @@
+import { seriesOrder, seriesSizes } from "@/library/series";
 import { priced, topCounts } from "@/stats/helpers";
 import { dayIndex, elapsedDays, type DateSpan } from "@/stats/range";
 import type { Book, IsoDate } from "@/types";
@@ -27,11 +28,21 @@ export type Summary = {
   /** Highlights keep every tied book (newest first) so ties can be browsed. Empty when none. */
   longest: Book[];
   fastest: { books: Book[]; days: number } | null;
+  /** The read that took the most days (start to finish). */
+  slowest: { books: Book[]; days: number } | null;
   favourite: Book[];
+  /**
+   * The series with the most books in the library among those with a book finished in the period (ties kept;
+   * only series of 2 or more). `books` are all its books in reading order.
+   */
+  longestSeries: { name: string; size: number; books: Book[] }[];
 };
 
-/** `books` should already be limited to the span (see `booksInSpan`), newest first. */
-export function summarize(books: Book[], span: DateSpan, today: IsoDate): Summary {
+/**
+ * `books` should already be limited to the span (see `booksInSpan`), newest first; `library` is every book (a
+ * series' length counts all its books).
+ */
+export function summarize(books: Book[], span: DateSpan, today: IsoDate, library: Book[] = books): Summary {
   const withPages = books.filter((b) => b.pages != null);
   const rated = books.filter((b) => b.rating != null);
   const timed = books
@@ -60,8 +71,27 @@ export function summarize(books: Book[], span: DateSpan, today: IsoDate): Summar
           days: Math.min(...timed.map((t) => t.days)),
         }
       : null,
+    slowest: timed.length
+      ? {
+          books: allMaxBy(timed, (t) => t.days).map((t) => t.book),
+          days: Math.max(...timed.map((t) => t.days)),
+        }
+      : null,
     favourite: allMaxBy(rated, (b) => b.rating!),
+    longestSeries: longestSeries(books, library),
   };
+}
+
+function longestSeries(books: Book[], library: Book[]): Summary["longestSeries"] {
+  const sizes = seriesSizes(library);
+  const names = new Map<string, string>(); // lower-case → name as written
+  for (const book of books) if (book.series) names.set(book.series.name.toLowerCase(), book.series.name);
+  const candidates = [...names].map(([key, name]) => ({ name, size: sizes.get(key) ?? 1 })).filter((s) => s.size >= 2);
+  return allMaxBy(candidates, (s) => s.size).map(({ name, size }) => ({
+    name,
+    size,
+    books: library.filter((b) => b.series?.name.toLowerCase() === name.toLowerCase()).sort(seriesOrder),
+  }));
 }
 
 /** Union of reading intervals clipped to the span — overlapping books count each day once. */

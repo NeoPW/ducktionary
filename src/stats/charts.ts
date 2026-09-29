@@ -1,3 +1,5 @@
+import type { LibraryFilter, Range } from "@/library/filter";
+import { SERIES_LENGTHS, seriesLengthGroup, seriesSize, seriesSizes } from "@/library/series";
 import { priced, topCounts } from "@/stats/helpers";
 import { dayIndex, daysInMonth, isoFromDayIndex, isoOf, type DateSpan } from "@/stats/range";
 import type { Book } from "@/types";
@@ -18,7 +20,8 @@ export type ChartKind =
   | "format"
   | "acquisition"
   | "spending-over-time"
-  | "price";
+  | "price"
+  | "series-length";
 
 export const CHARTS: readonly { kind: ChartKind; label: string }[] = [
   { kind: "books-over-time", label: "Books finished over time" },
@@ -33,11 +36,13 @@ export const CHARTS: readonly { kind: ChartKind; label: string }[] = [
   { kind: "acquisition", label: "How you got them" },
   { kind: "spending-over-time", label: "Money spent over time" },
   { kind: "price", label: "Price per book" },
+  { kind: "series-length", label: "Series length" },
 ];
 
 export type ChartStyle = "bar" | "line" | "pie";
 
-export type Bar = { key: string; label: string; value: number };
+/** `filter`: the books behind the bar, for opening them in the library (the stats span is added by the caller). */
+export type Bar = { key: string; label: string; value: number; filter?: LibraryFilter };
 
 /** How a pie slice is coloured: a fixed categorical slot, a step on the ordered ramp, or grey "Other". */
 export type SliceColor = { kind: "categorical"; index: number } | { kind: "ordinal"; step: number } | { kind: "other" };
@@ -95,7 +100,7 @@ export function buildChart(kind: ChartKind, books: Book[], span: DateSpan, libra
       const names = books.flatMap((b) => b.categories);
       return {
         layout: "rows",
-        bars: ranked(names, "Other categories"),
+        bars: ranked(names, "Other categories", (name) => ({ categories: [name] })),
         unit: BOOKS,
         styles: ["bar", "pie"],
         slices: namedSlices(names, library.flatMap((b) => b.categories)),
@@ -109,7 +114,7 @@ export function buildChart(kind: ChartKind, books: Book[], span: DateSpan, libra
     case "authors":
       return {
         layout: "rows",
-        bars: ranked(books.flatMap((b) => b.authors), "Other authors"),
+        bars: ranked(books.flatMap((b) => b.authors), "Other authors", (name) => ({ authors: [name] })),
         unit: BOOKS,
         // No pie: most authors appear once, so it would be almost all "Other".
         styles: ["bar"],
@@ -125,6 +130,7 @@ export function buildChart(kind: ChartKind, books: Book[], span: DateSpan, libra
           key: String(stars),
           label: `${Math.floor(stars) || ""}${stars % 1 ? "½" : ""}`,
           value: books.filter((b) => b.rating === stars).length,
+          filter: { ratings: [stars] },
         };
       });
       return {
@@ -143,6 +149,7 @@ export function buildChart(kind: ChartKind, books: Book[], span: DateSpan, libra
         key: c.value,
         label: c.label,
         value: books.filter((b) => lengthClass(b.pages) === c.value).length,
+        filter: { lengthClasses: [c.value] },
       }));
       return {
         layout: "columns",
@@ -166,7 +173,7 @@ export function buildChart(kind: ChartKind, books: Book[], span: DateSpan, libra
         { label: "500+", max: Infinity },
       ];
       const missing = books.filter((b) => b.pages == null).length;
-      const bars = histogram(books.flatMap((b) => (b.pages != null ? [b.pages] : [])), buckets);
+      const bars = histogram(books.flatMap((b) => (b.pages != null ? [b.pages] : [])), buckets, (pages) => ({ pages }));
       return {
         layout: "columns",
         bars,
@@ -187,7 +194,7 @@ export function buildChart(kind: ChartKind, books: Book[], span: DateSpan, libra
       ];
       const days = books.flatMap((b) => (b.startedAt ? [readingDays(b.startedAt, b.finishedAt)] : []));
       const untimed = books.length - days.length;
-      const bars = histogram(days, buckets);
+      const bars = histogram(days, buckets, (readingDays) => ({ readingDays }));
       return {
         layout: "columns",
         bars,
@@ -202,17 +209,19 @@ export function buildChart(kind: ChartKind, books: Book[], span: DateSpan, libra
     }
 
     case "format":
-      return optionChart(books, FORMATS, (b) => b.format, "format");
+      return optionChart(books, FORMATS, (b) => b.format, "format", (formats) => ({ formats }));
 
     case "acquisition":
-      return optionChart(books, ACQUISITIONS, (b) => b.acquisition, "how you got it");
+      return optionChart(books, ACQUISITIONS, (b) => b.acquisition, "how you got it", (acquisitions) => ({
+        acquisitions,
+      }));
 
     case "spending-over-time": {
       const bought = priced(books);
       const unpriced = books.filter((b) => isPriced(b.acquisition) && b.priceCents == null).length;
       return {
         layout: "columns",
-        bars: overTime(bought, span, (b) => b.priceCents! / 100),
+        bars: overTime(bought, span, (b) => b.priceCents! / 100, { priceCents: { min: 0 } }),
         unit: EUROS,
         styles: ["bar", "line"],
         valueFormat: "currency",
@@ -231,7 +240,7 @@ export function buildChart(kind: ChartKind, books: Book[], span: DateSpan, libra
         { label: "20–25", max: 2499 },
         { label: "25 €+", max: Infinity },
       ];
-      const bars = histogram(priced(books).map((b) => b.priceCents!), buckets);
+      const bars = histogram(priced(books).map((b) => b.priceCents!), buckets, (priceCents) => ({ priceCents }));
       return {
         layout: "columns",
         bars,
@@ -241,10 +250,37 @@ export function buildChart(kind: ChartKind, books: Book[], span: DateSpan, libra
         note: "Bought books with a price, grouped by what they cost (€).",
       };
     }
+
+    case "series-length": {
+      // Each series once, sized by all its books in the library; a book without a series is a single.
+      const sizes = seriesSizes(library);
+      const groups = new Map<string, number>();
+      for (const book of books) {
+        const key = book.series ? `series:${book.series.name.toLowerCase()}` : `book:${book.id}`;
+        groups.set(key, seriesSize(book, sizes));
+      }
+      const bars = SERIES_LENGTHS.map((length) => ({
+        key: length.value,
+        label: length.label,
+        value: [...groups.values()].filter((size) => seriesLengthGroup(size) === length.value).length,
+        filter: { seriesLengths: [length.value] },
+      }));
+      return {
+        layout: "columns",
+        bars,
+        unit: SERIES,
+        styles: ["bar", "line", "pie"],
+        slices: orderedSlices(bars),
+        note:
+          "Each series counts once, by how many of its books you've read in total; a book without a series is a " +
+          "single.",
+      };
+    }
   }
 }
 
 const EUROS: Unit = { one: "€", many: "€" };
+const SERIES: Unit = { one: "series", many: "series" };
 
 /**
  * A few fixed options (format, how you got it): one column each plus "Not set". Each option owns
@@ -255,10 +291,16 @@ function optionChart<T extends string>(
   options: readonly { value: T; label: string }[],
   get: (book: Book) => T | null,
   what: string,
+  pick: (values: (T | null)[]) => LibraryFilter,
 ): ChartData {
-  const bars: Bar[] = options.map((o) => ({ key: o.value, label: o.label, value: books.filter((b) => get(b) === o.value).length }));
+  const bars: Bar[] = options.map((o) => ({
+    key: o.value,
+    label: o.label,
+    value: books.filter((b) => get(b) === o.value).length,
+    filter: pick([o.value]),
+  }));
   const unset = books.filter((b) => get(b) == null).length;
-  if (unset > 0) bars.push({ key: "__unset", label: "Not set", value: unset });
+  if (unset > 0) bars.push({ key: "__unset", label: "Not set", value: unset, filter: pick([null]) });
   const slices: Slice[] = bars.flatMap((bar, index) =>
     bar.value > 0
       ? [{ ...bar, color: bar.key === "__unset" ? { kind: "other" } : { kind: "categorical", index } } as Slice]
@@ -293,7 +335,17 @@ function namedSlices(names: string[], libraryNames: string[]): Slice[] {
   const counts = topCounts(names, Infinity);
   const slices: Slice[] = coloured.flatMap((name, index) => {
     const value = counts.find((c) => c.name === name)?.books ?? 0;
-    return value > 0 ? [{ key: name, label: name, value, color: { kind: "categorical", index } as const }] : [];
+    return value > 0
+      ? [
+          {
+            key: name,
+            label: name,
+            value,
+            color: { kind: "categorical", index } as const,
+            filter: { categories: [name] },
+          },
+        ]
+      : [];
   });
   const rest = counts.filter((c) => !coloured.includes(c.name));
   if (rest.length > 0) {
@@ -358,20 +410,23 @@ export function timeBuckets(span: DateSpan): Bucket[] {
   return buckets;
 }
 
-function overTime(books: Book[], span: DateSpan, amount: (book: Book) => number): Bar[] {
+function overTime(books: Book[], span: DateSpan, amount: (book: Book) => number, extra: LibraryFilter = {}): Bar[] {
   return timeBuckets(span).map((bucket) => ({
     key: bucket.key,
     label: bucket.label,
+    filter: { ...extra, finished: { from: bucket.from, to: bucket.to } },
     value: books
       .filter((b) => b.finishedAt >= bucket.from && b.finishedAt <= bucket.to)
       .reduce((sum, b) => sum + amount(b), 0),
   }));
 }
 
-/** Most frequent names first; everything past the top rows folds into one "Other" row. */
-function ranked(names: string[], otherLabel: string): Bar[] {
+/** Most frequent names first; everything past the top rows folds into one "Other" row (not openable). */
+function ranked(names: string[], otherLabel: string, filterFor: (name: string) => LibraryFilter): Bar[] {
   const all = topCounts(names, Infinity);
-  const top = all.slice(0, MAX_ROWS).map(({ name, books }) => ({ key: name, label: name, value: books }));
+  const top: Bar[] = all
+    .slice(0, MAX_ROWS)
+    .map(({ name, books }) => ({ key: name, label: name, value: books, filter: filterFor(name) }));
   const rest = all.slice(MAX_ROWS);
   if (rest.length > 0) {
     top.push({
@@ -383,13 +438,23 @@ function ranked(names: string[], otherLabel: string): Bar[] {
   return top;
 }
 
-function histogram(values: number[], buckets: { label: string; max: number }[]): Bar[] {
+/** Whole-number values in ascending buckets (each up to and including its `max`). */
+function histogram(
+  values: number[],
+  buckets: { label: string; max: number }[],
+  filterFor: (range: Range) => LibraryFilter,
+): Bar[] {
   return buckets.map((bucket, i) => {
     const min = i === 0 ? -Infinity : buckets[i - 1].max;
+    const range: Range = {
+      ...(i > 0 ? { min: min + 1 } : {}),
+      ...(Number.isFinite(bucket.max) ? { max: bucket.max } : {}),
+    };
     return {
       key: bucket.label,
       label: bucket.label,
       value: values.filter((v) => v > min && v <= bucket.max).length,
+      filter: filterFor(range),
     };
   });
 }

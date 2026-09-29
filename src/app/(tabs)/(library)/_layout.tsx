@@ -9,6 +9,7 @@ export default function LibraryLayout() {
       <Stack.Screen name="index" options={{ title: "Library", headerRight: () => <SettingsButton /> }} />
       <Stack.Screen name="book/[id]/index" options={{ title: "" }} />
       <Stack.Screen name="book/[id]/edit" options={{ title: "Edit book" }} />
+      <Stack.Screen name="filter" options={{ title: "Filter", presentation: "modal" }} />
     </Stack>
   );
 }

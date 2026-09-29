@@ -32,14 +32,31 @@ function sample(
     format,
     acquisition,
     priceCents: price != null ? Math.round(price * 100) : null,
+    series: SERIES[title] ? { name: SERIES[title][0], position: SERIES[title][1] } : null,
   };
 }
+
+/**
+ * Series of the sample books: a trilogy read in full, two duologies (one series with only 2 of 3 read) and two
+ * first books of longer series, which count as singles.
+ */
+const SERIES: Record<string, [name: string, position: number]> = {
+  "Mistborn: The Final Empire": ["Mistborn", 1],
+  "The Well of Ascension": ["Mistborn", 2],
+  "The Hero of Ages": ["Mistborn", 3],
+  "The Three-Body Problem": ["Remembrance of Earth's Past", 1],
+  "The Dark Forest": ["Remembrance of Earth's Past", 2],
+  "The Name of the Wind": ["The Kingkiller Chronicle", 1],
+  "The Wise Man's Fear": ["The Kingkiller Chronicle", 2],
+  Dune: ["Dune", 1],
+  "The Hitchhiker's Guide to the Galaxy": ["The Hitchhiker's Guide to the Galaxy", 1],
+};
 
 /** [format, how you got it, price in euros] — any part may be unknown. */
 type Copy = [BookFormat | null, Acquisition | null, number | null];
 
 /**
- * ~2 years of reading (30 books) across 2025–2026, varied enough to exercise every stat: overlapping
+ * ~2 years of reading (34 books) across 2025–2026, varied enough to exercise every stat: overlapping
  * reads, books without a start date, unrated books, short/medium/long books, repeat authors.
  */
 const SAMPLE_BOOKS: BookDraft[] = [
@@ -53,6 +70,8 @@ const SAMPLE_BOOKS: BookDraft[] = [
   sample("9780140177398", "Of Mice and Men", ["John Steinbeck"], 107, "2025-05-03", "2025-05-05", 4, ["Classics", "Literary fiction"], ["paperback", "borrowed", null]),
   sample("9780441569595", "Neuromancer", ["William Gibson"], 317, "2025-06-10", "2025-06-28", 3, ["Science fiction", "Cyberpunk"], ["ebook", "bought", 6.99]),
   sample("9780765350381", "Mistborn: The Final Empire", ["Brandon Sanderson"], 669, "2025-07-01", "2025-07-24", 5, ["Fantasy"], ["paperback", "bought", 11.99]),
+  sample("9780765356130", "The Well of Ascension", ["Brandon Sanderson"], 781, "2025-07-26", "2025-08-20", 4.5, ["Fantasy"], ["paperback", "bought", 11.99]),
+  sample("9780765356147", "The Hero of Ages", ["Brandon Sanderson"], 748, "2025-10-10", "2025-11-02", 5, ["Fantasy"], ["paperback", "gift", null]),
   sample("9781984822178", "Normal People", ["Sally Rooney"], 304, "2025-08-02", "2025-08-09", null, ["Literary fiction", "Romance"], ["ebook", "bought", 8.99]),
   sample("9780451524935", "Nineteen Eighty-Four", ["George Orwell"], 318, "2025-09-01", "2025-09-15", 4.5, ["Classics", "Dystopia"], ["paperback", "bought", 8.5]),
   sample("9781250301697", "The Silent Patient", ["Alex Michaelides"], 352, "2025-10-03", "2025-10-08", 3, ["Thriller", "Mystery"], ["ebook", "bought", 5.99]),
@@ -64,12 +83,14 @@ const SAMPLE_BOOKS: BookDraft[] = [
   sample("9780547928227", "The Hobbit", ["J. R. R. Tolkien"], 300, "2026-02-10", "2026-02-21", 4.5, ["Fantasy", "Classics"], ["hardcover", "gift", null]),
   sample("9780399590504", "Educated", ["Tara Westover"], 384, "2026-02-22", "2026-03-10", 4.5, ["Non-fiction", "Memoir"], ["hardcover", "bought", 22]),
   sample("9780765382030", "The Three-Body Problem", ["Cixin Liu"], 400, "2026-03-12", "2026-04-02", 4, ["Science fiction"], ["paperback", "bought", 13.99]),
+  sample("9780765386694", "The Dark Forest", ["Cixin Liu"], 512, "2026-04-20", "2026-05-01", 4.5, ["Science fiction"], ["ebook", "bought", 9.99]),
   sample("9780316556347", "Circe", ["Madeline Miller"], 404, "2026-04-04", "2026-04-19", 4.5, ["Fantasy", "Mythology"], ["hardcover", "bought", 26.5]),
   sample("9780593135204", "Project Hail Mary", ["Andy Weir"], 496, "2026-05-02", "2026-05-11", 4.5, ["Science fiction"], ["hardcover", "bought", 27.99], "Rocky!"),
   sample("9780553418026", "The Martian", ["Andy Weir"], 387, "2026-05-13", "2026-05-18", 4, ["Science fiction"], ["paperback", "borrowed", null]),
   sample("9780684801223", "The Old Man and the Sea", ["Ernest Hemingway"], 127, "2026-06-01", "2026-06-03", 3.5, ["Classics"], ["paperback", "bought", 7.99]),
   sample("9780525559474", "The Midnight Library", ["Matt Haig"], 304, null, "2026-06-07", 3, ["Literary fiction", "Fantasy"], ["ebook", "bought", 7.99]),
   sample("9780756404741", "The Name of the Wind", ["Patrick Rothfuss"], 662, "2026-06-10", "2026-07-12", 5, ["Fantasy"], ["paperback", "bought", 14.99]),
+  sample("9780756407919", "The Wise Man's Fear", ["Patrick Rothfuss"], 994, "2026-07-13", "2026-08-30", 4, ["Fantasy"], ["hardcover", "borrowed", null]),
   sample("9780593318171", "Klara and the Sun", ["Kazuo Ishiguro"], 303, "2026-07-15", "2026-07-26", null, ["Literary fiction", "Science fiction"], ["ebook", "bought", 9.99]),
   sample("9780804172448", "Station Eleven", ["Emily St. John Mandel"], 333, "2026-08-01", "2026-08-14", 4, ["Literary fiction", "Dystopia"], ["paperback", null, null]),
   // Read alongside Station Eleven — overlapping days must not be double-counted.

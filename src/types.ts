@@ -18,8 +18,12 @@ export type Book = {
   priceCents: number | null;
   format: BookFormat | null;
   acquisition: Acquisition | null;
+  /** The series the book belongs to, and its number in it (null when unknown). */
+  series: BookSeries | null;
   createdAt: string;
 };
+
+export type BookSeries = { name: string; position: number | null };
 
 export type BookFormat = "hardcover" | "paperback" | "ebook";
 export type Acquisition = "bought" | "gift" | "borrowed";

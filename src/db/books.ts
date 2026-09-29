@@ -20,14 +20,17 @@ type BookRow = {
   acquisition: string | null;
   created_at: string;
   categories: string;
+  series_name: string | null;
+  series_position: number | null;
 };
 
 const SELECT_BOOKS = `
   SELECT b.*,
     (SELECT json_group_array(c.name)
        FROM book_categories bc JOIN categories c ON c.id = bc.category_id
-      WHERE bc.book_id = b.id) AS categories
-  FROM books b
+      WHERE bc.book_id = b.id) AS categories,
+    s.name AS series_name
+  FROM books b LEFT JOIN series s ON s.id = b.series_id
 `;
 
 function toBook(row: BookRow): Book {
@@ -46,6 +49,7 @@ function toBook(row: BookRow): Book {
     priceCents: row.price_cents,
     format: isFormat(row.format) ? row.format : null,
     acquisition: isAcquisition(row.acquisition) ? row.acquisition : null,
+    series: row.series_name ? { name: row.series_name, position: row.series_position } : null,
     createdAt: row.created_at,
   };
 }
@@ -91,7 +95,27 @@ function toParams(draft: BookDraft) {
         : null,
     $format: draft.format,
     $acquisition: draft.acquisition,
+    // A number only means something with a series.
+    $series_position:
+      draft.series?.name.trim() && draft.series.position != null && draft.series.position > 0
+        ? draft.series.position
+        : null,
   };
+}
+
+/** The series' id, creating it when needed; null for no series. Names match regardless of case. */
+async function seriesId(txn: SQLiteDatabase, series: BookDraft["series"]): Promise<number | null> {
+  const name = series?.name.trim();
+  if (!name) return null;
+  await txn.runAsync("INSERT OR IGNORE INTO series (name) VALUES (?)", name);
+  const row = await txn.getFirstAsync<{ id: number }>("SELECT id FROM series WHERE name = ?", name);
+  return row?.id ?? null;
+}
+
+async function deleteUnusedSeries(db: SQLiteDatabase) {
+  await db.runAsync(
+    "DELETE FROM series WHERE id NOT IN (SELECT DISTINCT series_id FROM books WHERE series_id IS NOT NULL)",
+  );
 }
 
 async function setCategories(db: SQLiteDatabase, bookId: number, names: string[]) {
@@ -142,10 +166,11 @@ export async function insertBook(db: SQLiteDatabase, draft: BookDraft): Promise<
 export async function insertBookRow(txn: SQLiteDatabase, draft: BookDraft, createdAt?: string): Promise<number> {
   const result = await txn.runAsync(
     `INSERT INTO books (isbn, title, authors, pages, cover_url, started_at, finished_at, rating, comment,
-                        price_cents, format, acquisition, created_at)
+                        price_cents, format, acquisition, series_id, series_position, created_at)
      VALUES ($isbn, $title, $authors, $pages, $cover_url, $started_at, $finished_at, $rating, $comment,
-             $price_cents, $format, $acquisition, COALESCE($created_at, datetime('now')))`,
-    { ...toParams(draft), $created_at: createdAt ?? null },
+             $price_cents, $format, $acquisition, $series_id, $series_position,
+             COALESCE($created_at, datetime('now')))`,
+    { ...toParams(draft), $series_id: await seriesId(txn, draft.series), $created_at: createdAt ?? null },
   );
   const id = result.lastInsertRowId;
   await setCategories(txn, id, draft.categories);
@@ -159,11 +184,13 @@ export async function updateBook(db: SQLiteDatabase, id: number, draft: BookDraf
       `UPDATE books SET isbn = $isbn, title = $title, authors = $authors, pages = $pages,
          cover_url = $cover_url, started_at = $started_at, finished_at = $finished_at,
          rating = $rating, comment = $comment,
-         price_cents = $price_cents, format = $format, acquisition = $acquisition
+         price_cents = $price_cents, format = $format, acquisition = $acquisition,
+         series_id = $series_id, series_position = $series_position
        WHERE id = $id`,
-      { ...params, $id: id },
+      { ...params, $series_id: await seriesId(txn, draft.series), $id: id },
     );
     await setCategories(txn, id, draft.categories);
+    await deleteUnusedSeries(txn);
   });
   notifyLibraryChanged();
 }
@@ -172,13 +199,14 @@ export async function deleteBook(db: SQLiteDatabase, id: number): Promise<void> 
   await db.withExclusiveTransactionAsync(async (txn) => {
     await txn.runAsync("DELETE FROM books WHERE id = ?", id);
     await deleteUnusedCategories(txn);
+    await deleteUnusedSeries(txn);
   });
   notifyLibraryChanged();
 }
 
 /** Empties the library (books and their categories) inside a transaction the caller holds. */
 export async function deleteAllBooks(txn: SQLiteDatabase): Promise<void> {
-  await txn.execAsync("DELETE FROM book_categories; DELETE FROM books; DELETE FROM categories;");
+  await txn.execAsync("DELETE FROM book_categories; DELETE FROM books; DELETE FROM categories; DELETE FROM series;");
 }
 
 /** All category names in use, most used first — offered as suggestions in the book form. */
@@ -187,6 +215,15 @@ export async function listCategories(db: SQLiteDatabase): Promise<string[]> {
     `SELECT c.name FROM categories c
        JOIN book_categories bc ON bc.category_id = c.id
       GROUP BY c.id ORDER BY count(*) DESC, c.name COLLATE NOCASE`,
+  );
+  return rows.map((row) => row.name);
+}
+
+/** Series names in use, most books first — suggestions for the book form. */
+export async function listSeries(db: SQLiteDatabase): Promise<string[]> {
+  const rows = await db.getAllAsync<{ name: string }>(
+    `SELECT s.name FROM series s JOIN books b ON b.series_id = s.id
+      GROUP BY s.id ORDER BY count(*) DESC, s.name COLLATE NOCASE`,
   );
   return rows.map((row) => row.name);
 }

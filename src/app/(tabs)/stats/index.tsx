@@ -76,7 +76,7 @@ export default function StatsScreen() {
     kind === "year" ? yearRange : kind === "month" ? monthRange : kind === "custom" ? customRange : { kind: "all" };
   const span = resolveRange(range, earliest, today);
   const inSpan = booksInSpan(books.data, span);
-  const summary = summarize(inSpan, span, today);
+  const summary = summarize(inSpan, span, today, books.data);
 
   const monthIndex = (r: { year: number; month: number }) => r.year * 12 + r.month;
   const currentMonth = monthIndex({ year: thisYear, month: thisMonth });

@@ -12,8 +12,11 @@ import { BACKUP_SETTING_KEYS, type SettingKey } from "@/storage/keys";
 import type { Book, BookDraft } from "@/types";
 import { isAcquisition, isFormat } from "@/utils/book-attributes";
 
-/** Bump when the snapshot shape changes; older formats must keep restoring. */
-export const SNAPSHOT_FORMAT = 1;
+/**
+ * Bump when the snapshot shape changes; older formats must keep restoring.
+ * 1: first version · 2: books have a `series` (format 1 backups restore without series).
+ */
+export const SNAPSHOT_FORMAT = 2;
 
 
 export type SnapshotBook = Omit<Book, "id">;
@@ -93,6 +96,15 @@ function checkBook(b: unknown, index: number): SnapshotBook {
     throw new SnapshotError(`${where} has an unknown "how you got it".`);
   }
   if (!text(b.createdAt, 40)) throw new SnapshotError(`${where} has no creation time.`);
+  const series = b.series ?? null; // missing in format 1
+  if (
+    !(
+      series === null ||
+      (isObject(series) && text(series.name, 200) && series.name.trim() && numberOrNull(series.position, 0.01, 999))
+    )
+  ) {
+    throw new SnapshotError(`${where} has an invalid series.`);
+  }
   return {
     title: b.title,
     authors: b.authors,
@@ -107,6 +119,7 @@ function checkBook(b: unknown, index: number): SnapshotBook {
     priceCents: b.priceCents as number | null,
     format: b.format,
     acquisition: b.acquisition,
+    series: series && { name: series.name as string, position: series.position as number | null },
     createdAt: b.createdAt,
   };
 }

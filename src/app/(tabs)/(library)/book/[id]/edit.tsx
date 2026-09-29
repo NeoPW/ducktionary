@@ -7,7 +7,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { RouteBook } from "@/components/route-book";
 import { useToast } from "@/components/toast";
 import { hasIsbn, updateBook } from "@/db/books";
-import { useCategories } from "@/hooks/use-books";
+import { useCategories, useSeriesNames } from "@/hooks/use-books";
 import type { Book, BookDraft } from "@/types";
 import { bookToDraft } from "@/utils/book-draft";
 
@@ -22,6 +22,7 @@ function EditForm({ book }: { book: Book }) {
   // Captured once so refetches on focus don't reset what the user is typing.
   const [initial] = useState(() => bookToDraft(book));
   const categories = useCategories();
+  const seriesNames = useSeriesNames();
 
   const save = async (draft: BookDraft) => {
     if (draft.isbn && draft.isbn !== book.isbn && (await hasIsbn(db, draft.isbn))) {
@@ -45,6 +46,7 @@ function EditForm({ book }: { book: Book }) {
       submitLabel="Save changes"
       onSubmit={save}
       categorySuggestions={categories.data ?? []}
+      seriesSuggestions={seriesNames.data ?? []}
     />
   );
 }

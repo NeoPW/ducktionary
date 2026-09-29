@@ -1,4 +1,4 @@
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import Svg, { Circle, Path, Text as SvgText } from "react-native-svg";
 
 import { AppText } from "@/components/app-text";
@@ -16,13 +16,15 @@ type PieChartProps = {
   slices: Slice[];
   unit: Unit;
   accessibilityLabel: string;
+  /** Opens the books behind a slice (legend rows become buttons). */
+  onOpen?: (slice: Slice) => void;
 };
 
 /**
  * Donut with the total in the middle and a legend that doubles as the value table — identity is
  * never carried by colour alone.
  */
-export function PieChart({ slices, unit, accessibilityLabel }: PieChartProps) {
+export function PieChart({ slices, unit, accessibilityLabel, onOpen }: PieChartProps) {
   const { colors, charts } = useTheme();
   const total = slices.reduce((sum, s) => sum + s.value, 0);
 
@@ -78,7 +80,14 @@ export function PieChart({ slices, unit, accessibilityLabel }: PieChartProps) {
 
       <View style={styles.legend}>
         {slices.map((slice) => (
-          <View key={slice.key} style={styles.legendRow}>
+          <Pressable
+            key={slice.key}
+            style={styles.legendRow}
+            disabled={!onOpen || !slice.filter}
+            onPress={() => onOpen?.(slice)}
+            accessibilityRole={onOpen && slice.filter ? "button" : undefined}
+            accessibilityHint={onOpen && slice.filter ? "Shows these books in your library" : undefined}
+          >
             <View style={[styles.swatch, { backgroundColor: fill(slice.color) }]} />
             <AppText variant="label" numberOfLines={1} style={styles.legendLabel}>
               {slice.label}
@@ -87,7 +96,10 @@ export function PieChart({ slices, unit, accessibilityLabel }: PieChartProps) {
             <AppText variant="caption" color="muted" style={styles.percent}>
               {total > 0 ? `${Math.round((slice.value / total) * 100)}%` : ""}
             </AppText>
-          </View>
+            <AppText variant="label" color="muted" style={styles.chevron}>
+              {onOpen && slice.filter ? "›" : ""}
+            </AppText>
+          </Pressable>
         ))}
       </View>
     </View>
@@ -125,4 +137,5 @@ const styles = StyleSheet.create({
   swatch: { width: 12, height: 12, borderRadius: 3 },
   legendLabel: { flex: 1 },
   percent: { width: 40, textAlign: "right" },
+  chevron: { width: 10 },
 });

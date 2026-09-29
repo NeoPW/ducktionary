@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Modal, Pressable, StyleSheet, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText } from "@/components/app-text";
@@ -11,12 +11,21 @@ type DropdownProps<T extends string> = {
   options: readonly { value: T; label: string }[];
   onChange: (value: T) => void;
   accessibilityLabel: string;
+  /** Body-size text, for use among form fields (default: heading-size, for pickers above content). */
+  compact?: boolean;
 };
 
 /** A select field that opens a bottom sheet of options. */
-export function Dropdown<T extends string>({ value, options, onChange, accessibilityLabel }: DropdownProps<T>) {
+export function Dropdown<T extends string>({
+  value,
+  options,
+  onChange,
+  accessibilityLabel,
+  compact,
+}: DropdownProps<T>) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
   const [open, setOpen] = useState(false);
   const current = options.find((o) => o.value === value) ?? options[0];
 
@@ -28,7 +37,7 @@ export function Dropdown<T extends string>({ value, options, onChange, accessibi
         onPress={() => setOpen(true)}
         style={[styles.field, { backgroundColor: colors.surface, borderColor: colors.border }]}
       >
-        <AppText variant="heading" numberOfLines={1} style={styles.flex}>
+        <AppText variant={compact ? "body" : "heading"} numberOfLines={1} style={styles.flex}>
           {current.label}
         </AppText>
         <AppText variant="label" color="primary">
@@ -48,31 +57,34 @@ export function Dropdown<T extends string>({ value, options, onChange, accessibi
             <AppText variant="label" color="muted" style={styles.sheetTitle}>
               {accessibilityLabel}
             </AppText>
-            {options.map((option) => {
-              const selected = option.value === value;
-              return (
-                <Pressable
-                  key={option.value}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  android_ripple={{ color: colors.border }}
-                  onPress={() => {
-                    onChange(option.value);
-                    setOpen(false);
-                  }}
-                  style={styles.option}
-                >
-                  <AppText style={styles.flex} color={selected ? "text" : "muted"}>
-                    {option.label}
-                  </AppText>
-                  {selected && (
-                    <AppText variant="label" color="primary">
-                      ✓
+            {/* Long lists (e.g. many series) scroll instead of running off the screen. */}
+            <ScrollView style={{ maxHeight: height * 0.6 }}>
+              {options.map((option) => {
+                const selected = option.value === value;
+                return (
+                  <Pressable
+                    key={option.value}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    android_ripple={{ color: colors.border }}
+                    onPress={() => {
+                      onChange(option.value);
+                      setOpen(false);
+                    }}
+                    style={styles.option}
+                  >
+                    <AppText style={styles.flex} color={selected ? "text" : "muted"}>
+                      {option.label}
                     </AppText>
-                  )}
-                </Pressable>
-              );
-            })}
+                    {selected && (
+                      <AppText variant="label" color="primary">
+                        ✓
+                      </AppText>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
           </View>
         </Pressable>
       </Modal>
