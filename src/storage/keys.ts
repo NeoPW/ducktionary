@@ -5,6 +5,7 @@
 export const SETTING_KEYS = {
   theme: "theme.v1",
   gooseEnabled: "goose.enabled",
+  gooseVisitors: "goose.visitors",
   statsRange: "stats.range",
   statsChart: "stats.chart",
   statsChartStyle: "stats.chartStyle",

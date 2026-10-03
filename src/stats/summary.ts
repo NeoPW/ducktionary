@@ -20,8 +20,6 @@ export type Summary = {
   /** Pages divided by the days of the span that have passed. */
   pagesPerDay: number | null;
   topCategory: { name: string; books: number } | null;
-  /** Distinct authors. */
-  authors: number;
   /** Money spent (cents) on bought books with a price, and how many that is. */
   spentCents: number;
   pricedBooks: number;
@@ -61,7 +59,6 @@ export function summarize(books: Book[], span: DateSpan, today: IsoDate, library
     avgDaysPerBook: timed.length ? average(timed.map((t) => t.days)) : null,
     pagesPerDay: elapsed > 0 && withPages.length ? pages / elapsed : null,
     topCategory: topCounts(books.flatMap((b) => b.categories), 1)[0] ?? null,
-    authors: new Set(books.flatMap((b) => b.authors.map((a) => a.toLowerCase()))).size,
     spentCents: priced(books).reduce((sum, b) => sum + b.priceCents!, 0),
     pricedBooks: priced(books).length,
     longest: allMaxBy(withPages, (b) => b.pages!),

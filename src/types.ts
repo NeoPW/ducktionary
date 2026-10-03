@@ -10,7 +10,7 @@ export type Book = {
   coverUrl: string | null;
   startedAt: IsoDate | null;
   finishedAt: IsoDate;
-  /** 0.5–5 in half-star steps, or null when unrated. */
+  /** ¼–5 in quarter-star steps, or null when unrated. */
   rating: number | null;
   comment: string | null;
   categories: string[];

@@ -11,7 +11,14 @@ import { onLibraryChanged } from "@/db/events";
 import { readSetting, writeSetting } from "@/storage/settings";
 import { pickBackupFile, shareBackupFile } from "@/sync/backup-file";
 import * as cloud from "@/sync/cloud";
-import { buildSnapshot, contentHash, restoreSnapshot, type SettingsStore, type Snapshot } from "@/sync/snapshot";
+import {
+  buildSnapshot,
+  contentHash,
+  libraryHash,
+  restoreSnapshot,
+  type SettingsStore,
+  type Snapshot,
+} from "@/sync/snapshot";
 import { useTheme } from "@/theme/use-theme";
 import { BOOKS, plural } from "@/utils/format";
 
@@ -81,8 +88,8 @@ export function BackupProvider({ children }: { children: ReactNode }) {
   const offeredRestoreFor = useRef<string | null>(null);
 
   const userId = session?.user.id ?? null;
-  /** Device-only bookkeeping per account: the last uploaded content hash and upload time. */
-  const key = (name: "hash" | "at") => `backup.${name}.${userId}`;
+  /** Device-only bookkeeping per account: the last uploaded content and library hashes, and the upload time. */
+  const key = (name: "hash" | "books" | "at") => `backup.${name}.${userId}`;
   const setProblem = (message: string | null) => userId && setProblems((all) => ({ ...all, [userId]: message }));
 
   useEffect(() => cloud.subscribeToSession(setSession), []);
@@ -97,11 +104,22 @@ export function BackupProvider({ children }: { children: ReactNode }) {
   };
 
   // ─── Back up / restore ────────────────────────────────────────────────
-  const backUp = async (force: boolean): Promise<BackupResult> => {
+  /**
+   * "manual" uploads whenever anything (books or settings) changed since the last backup; "automatic" only when
+   * the books did, so settings alone never cause a backup; "force" always uploads.
+   */
+  const backUp = async (mode: "manual" | "automatic" | "force"): Promise<BackupResult> => {
     if (!userId) throw new Error("Sign in to back up.");
+    const force = mode === "force";
     const snapshot = await buildSnapshot(db, { appVersion, settings: settingsStore });
     const hash = contentHash(snapshot);
-    if (!force && readSetting(key("hash")) === hash) return { kind: "unchanged" };
+    const books = libraryHash(snapshot);
+    if (mode === "manual" && readSetting(key("hash")) === hash) return { kind: "unchanged" };
+    if (mode === "automatic") {
+      // Backups made before the library hash existed: the same content means the same books.
+      if (readSetting(key("books")) == null && readSetting(key("hash")) === hash) writeSetting(key("books"), books);
+      if (readSetting(key("books")) === books) return { kind: "unchanged" };
+    }
 
     const newest = await cloud.newestCloudBackup();
     if (!force && newest && snapshot.books.length < newest.bookCount * SHRINK_LIMIT) {
@@ -110,6 +128,7 @@ export function BackupProvider({ children }: { children: ReactNode }) {
     await cloud.uploadBackup(snapshot);
     const at = new Date().toISOString();
     writeSetting(key("hash"), hash);
+    writeSetting(key("books"), books);
     writeSetting(key("at"), at);
     setBackedUpAt((all) => ({ ...all, [userId]: at }));
     return { kind: "uploaded" };
@@ -120,7 +139,10 @@ export function BackupProvider({ children }: { children: ReactNode }) {
     theme.reloadFromStorage();
     goose.reloadFromStorage();
     // The restored library is what the cloud already has; don't upload it again.
-    if (userId) writeSetting(key("hash"), contentHash(snapshot));
+    if (userId) {
+      writeSetting(key("hash"), contentHash(snapshot));
+      writeSetting(key("books"), libraryHash(snapshot));
+    }
     setDueAt(null);
     return n;
   };
@@ -132,7 +154,7 @@ export function BackupProvider({ children }: { children: ReactNode }) {
     if (!userId) return;
     setDueAt(null);
     try {
-      const result = await backUp(false);
+      const result = await backUp("automatic");
       setProblem(
         result.kind === "shrunk"
           ? `Not backed up automatically: your library has ${result.books} books, your last backup ${result.backedUp}. Use "Back up now" if that's intended.`
@@ -207,7 +229,7 @@ export function BackupProvider({ children }: { children: ReactNode }) {
     changePassword: (password) => withBusy(() => cloud.changePassword(password)),
     backUpNow: (options) =>
       withBusy(async () => {
-        const result = await backUp(options?.force ?? false);
+        const result = await backUp(options?.force ? "force" : "manual");
         if (result.kind !== "shrunk") setProblem(null);
         return result;
       }),

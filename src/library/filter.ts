@@ -8,6 +8,7 @@ import type { Acquisition, Book, BookFormat, IsoDate } from "@/types";
 import { acquisitionLabel, formatLabel, formatPrice, isAcquisition, isFormat, isPriced } from "@/utils/book-attributes";
 import { formatDate, parseIsoDate, readingDays } from "@/utils/dates";
 import { LENGTH_CLASSES, lengthClass, type LengthClass } from "@/utils/length-class";
+import { STAR_GROUPS, starGroup, type StarGroup } from "@/utils/rating";
 
 /** Inclusive; either end may be open. */
 export type Range = { min?: number; max?: number };
@@ -16,7 +17,8 @@ export type LibraryFilter = {
   finished?: { from?: IsoDate; to?: IsoDate };
   categories?: string[];
   authors?: string[];
-  ratings?: (number | null)[];
+  /** Whole-star groups (see `starGroup`); null = not rated. */
+  stars?: (StarGroup | null)[];
   lengthClasses?: (LengthClass | null)[];
   pages?: Range;
   readingDays?: Range;
@@ -41,7 +43,7 @@ export function matchesFilter(book: Book, filter: LibraryFilter, sizes?: SeriesS
   }
   if (f.categories && !book.categories.some((c) => f.categories!.map(lower).includes(lower(c)))) return false;
   if (f.authors && !book.authors.some((a) => f.authors!.map(lower).includes(lower(a)))) return false;
-  if (f.ratings && !f.ratings.includes(book.rating)) return false;
+  if (f.stars && !f.stars.includes(starGroup(book.rating))) return false;
   if (f.lengthClasses && !f.lengthClasses.includes(lengthClass(book.pages))) return false;
   if (f.pages && (book.pages == null || !inRange(book.pages, f.pages))) return false;
   if (f.readingDays && (!book.startedAt || !inRange(readingDays(book.startedAt, book.finishedAt), f.readingDays))) {
@@ -93,7 +95,7 @@ function spanLabel({ from, to }: { from?: IsoDate; to?: IsoDate }): string {
   return from ? `Finished since ${formatDate(from)}` : to ? `Finished until ${formatDate(to)}` : "Any time";
 }
 
-const stars = (r: number | null) => (r == null ? "Not rated" : `${r} ★`);
+const stars = (g: StarGroup | null) => (g == null ? "Not rated" : `${STAR_GROUPS[g].label} ★`);
 
 /** One removable chip per active part, in a stable order. */
 export function filterChips(filter: LibraryFilter): { key: FilterKey; label: string }[] {
@@ -103,7 +105,7 @@ export function filterChips(filter: LibraryFilter): { key: FilterKey; label: str
   if (f.finished) chips.push({ key: "finished", label: spanLabel(f.finished) });
   if (f.categories) chips.push({ key: "categories", label: list(f.categories) });
   if (f.authors) chips.push({ key: "authors", label: `By ${list(f.authors)}` });
-  if (f.ratings) chips.push({ key: "ratings", label: list(f.ratings.map(stars)) });
+  if (f.stars) chips.push({ key: "stars", label: list(f.stars.map(stars)) });
   if (f.lengthClasses) {
     const label = (c: LengthClass | null) => LENGTH_CLASSES.find((l) => l.value === c)?.label ?? "No page count";
     chips.push({ key: "lengthClasses", label: list(f.lengthClasses.map(label)) });
@@ -161,7 +163,7 @@ export function decodeFilter(param: string | string[] | undefined): LibraryFilte
     finished: finished && (finished.from || finished.to) ? finished : undefined,
     categories: strings(raw.categories),
     authors: strings(raw.authors),
-    ratings: nullableList(raw.ratings, (x): x is number => typeof x === "number" && x >= 0.5 && x <= 5),
+    stars: nullableList(raw.stars, (x): x is StarGroup => STAR_GROUPS.some((g) => g.value === x)),
     lengthClasses: nullableList(raw.lengthClasses, (x): x is LengthClass => x === "short" || x === "medium" || x === "long"),
     pages: range(raw.pages),
     readingDays: range(raw.readingDays),

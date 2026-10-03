@@ -49,3 +49,7 @@ docs/mascot-art/candidates/
 
 # Style references by other artists — kept locally, never committed
 example_images/
+
+# Personal data for local testing (e.g. a real library as example data) — never committed
+local/*
+!local/README.md

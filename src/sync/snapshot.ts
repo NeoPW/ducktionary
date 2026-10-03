@@ -11,12 +11,15 @@ import { notifyLibraryChanged } from "@/db/events";
 import { BACKUP_SETTING_KEYS, type SettingKey } from "@/storage/keys";
 import type { Book, BookDraft } from "@/types";
 import { isAcquisition, isFormat } from "@/utils/book-attributes";
+import { isValidCoverUrl } from "@/utils/cover";
+import { MAX_RATING, RATING_STEP } from "@/utils/rating";
 
 /**
  * Bump when the snapshot shape changes; older formats must keep restoring.
- * 1: first version · 2: books have a `series` (format 1 backups restore without series).
+ * 1: first version · 2: books have a `series` (format 1 backups restore without series) ·
+ * 3: a cover can be a photo from the device (a JPEG data URI).
  */
-export const SNAPSHOT_FORMAT = 2;
+export const SNAPSHOT_FORMAT = 3;
 
 
 export type SnapshotBook = Omit<Book, "id">;
@@ -84,12 +87,12 @@ function checkBook(b: unknown, index: number): SnapshotBook {
     throw new SnapshotError(`${where} has an invalid start date.`);
   }
   if (!textOrNull(b.isbn, 20)) throw new SnapshotError(`${where} has an invalid ISBN.`);
-  if (!(b.coverUrl === null || (text(b.coverUrl, 2000) && /^https:\/\//.test(b.coverUrl)))) {
+  if (!(b.coverUrl === null || (typeof b.coverUrl === "string" && isValidCoverUrl(b.coverUrl)))) {
     throw new SnapshotError(`${where} has an invalid cover link.`);
   }
   if (!textOrNull(b.comment, 20_000)) throw new SnapshotError(`${where} has an invalid comment.`);
   if (!numberOrNull(b.pages, 1, 100_000)) throw new SnapshotError(`${where} has an invalid page count.`);
-  if (!numberOrNull(b.rating, 0.5, 5)) throw new SnapshotError(`${where} has an invalid rating.`);
+  if (!numberOrNull(b.rating, RATING_STEP, MAX_RATING)) throw new SnapshotError(`${where} has an invalid rating.`);
   if (!numberOrNull(b.priceCents, 0, 100_000_000)) throw new SnapshotError(`${where} has an invalid price.`);
   if (!(b.format === null || isFormat(b.format))) throw new SnapshotError(`${where} has an unknown format.`);
   if (!(b.acquisition === null || isAcquisition(b.acquisition))) {
@@ -175,7 +178,19 @@ export async function restoreSnapshot(db: SQLiteDatabase, snapshot: Snapshot, se
 
 /** Stable fingerprint of what a backup contains (ignores when it was taken) — skips identical uploads. */
 export function contentHash(snapshot: Snapshot): string {
-  const source = stableStringify([snapshot.books, snapshot.settings]);
+  return fingerprint(stableStringify([snapshot.books, snapshot.settings]));
+}
+
+/**
+ * Fingerprint of the books alone. Automatic backups follow this one: switching a chart or the search order
+ * changes settings, which ride along with the next backup but never cause one by themselves.
+ */
+export function libraryHash(snapshot: Snapshot): string {
+  return fingerprint(stableStringify(snapshot.books));
+}
+
+/** FNV-1a over the text, plus its length. */
+function fingerprint(source: string): string {
   let hash = 0x811c9dc5;
   for (let i = 0; i < source.length; i++) {
     hash ^= source.charCodeAt(i);

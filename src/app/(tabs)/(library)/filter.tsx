@@ -10,6 +10,7 @@ import { DateField } from "@/components/form/date-field";
 import { MultiChoiceChips } from "@/components/form/multi-choice-chips";
 import { FieldShell } from "@/components/form/text-field";
 import { useBottomInset } from "@/components/screen";
+import { ScreenBackground } from "@/components/screen-background";
 import { useBooks } from "@/hooks/use-books";
 import { topCounts } from "@/stats/helpers";
 import {
@@ -28,8 +29,9 @@ import type { Acquisition, BookFormat, IsoDate } from "@/types";
 import { ACQUISITIONS, FORMATS } from "@/utils/book-attributes";
 import { BOOKS, plural } from "@/utils/format";
 import { LENGTH_CLASSES, type LengthClass } from "@/utils/length-class";
+import { STAR_GROUPS, type StarGroup } from "@/utils/rating";
 
-const RATINGS = [5, 4.5, 4, 3.5, 3, 2.5, 2, 1.5, 1, 0.5].map((r) => ({ value: r as number | null, label: `${r} ★` }));
+const STARS = [...STAR_GROUPS].reverse().map((g) => ({ value: g.value as StarGroup | null, label: `${g.label} ★` }));
 const NOT_SET = { value: null, label: "Not set" } as const;
 
 /** Filters that come from the stats but can't be edited here; they're shown as removable chips. */
@@ -72,6 +74,7 @@ export default function FilterScreen() {
 
   return (
     <View style={[styles.fill, { backgroundColor: colors.background }]}>
+      <ScreenBackground />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {statsChips.length > 0 && (
           <View style={styles.chips}>
@@ -121,9 +124,9 @@ export default function FilterScreen() {
 
         <MultiChoiceChips
           label="Rating"
-          options={[...RATINGS, { value: null, label: "Not rated" }]}
-          values={filter.ratings ?? []}
-          onChange={(values) => setList("ratings", values)}
+          options={[...STARS, { value: null, label: "Not rated" }]}
+          values={filter.stars ?? []}
+          onChange={(values) => setList("stars", values)}
         />
         <MultiChoiceChips<LengthClass | null>
           label="Length"

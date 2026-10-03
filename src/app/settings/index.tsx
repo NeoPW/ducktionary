@@ -1,17 +1,22 @@
+import { Image } from "expo-image";
 import { router } from "expo-router";
+import { useState } from "react";
 import { Pressable, StyleSheet, Switch, View } from "react-native";
 
 import { AppText } from "@/components/app-text";
 import { Button } from "@/components/button";
 import { Card } from "@/components/card";
-import { Mascot } from "@/components/mascot";
 import { useGoose } from "@/components/goose/goose-visits";
+import { Mascot } from "@/components/mascot";
 import { Screen } from "@/components/screen";
 import { SegmentedControl } from "@/components/segmented-control";
 import { BackupSection } from "@/components/settings/backup-section";
+import { useToast } from "@/components/toast";
+import { BACKGROUND_STRENGTHS, useBackground } from "@/theme/background";
 import type { ColorScheme } from "@/theme/schemes";
 import { radii, spacing } from "@/theme/tokens";
 import { useTheme, type ThemePreference } from "@/theme/use-theme";
+import { toError } from "@/utils/errors";
 
 const MODES: readonly { value: ThemePreference; label: string }[] = [
   { value: "system", label: "System" },
@@ -58,6 +63,8 @@ export default function SettingsScreen() {
         </AppText>
       </View>
 
+      <BackgroundSection />
+
       <View style={styles.section}>
         <AppText variant="heading">Goose</AppText>
         <Card style={styles.gooseCard}>
@@ -76,11 +83,69 @@ export default function SettingsScreen() {
             thumbColor={colors.surface}
           />
         </Card>
-        <Button title="Summon the goose" variant="secondary" onPress={goose.summon} />
+        <Button title="Choose visitors" variant="secondary" onPress={() => router.push("/settings/visitors")} />
+        <Button title="Summon the goose" variant="secondary" disabled={!goose.canVisit} onPress={() => goose.summon()} />
+        {!goose.canVisit && (
+          <AppText variant="caption" color="muted">
+            Every visitor is switched off — choose who may visit above.
+          </AppText>
+        )}
       </View>
 
       <BackupSection />
     </Screen>
+  );
+}
+
+/** A photo behind every screen, and how much of it shows through. */
+function BackgroundSection() {
+  const { colors } = useTheme();
+  const background = useBackground();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+
+  const choose = async () => {
+    setBusy(true);
+    try {
+      if (await background.choose()) toast("New background — honk!");
+    } catch (error) {
+      toast(`Couldn't use that picture: ${toError(error).message}`, "confused");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <View style={styles.section}>
+      <AppText variant="heading">Background picture</AppText>
+      {background.uri ? (
+        <>
+          <Card style={styles.pictureCard}>
+            <Image
+              source={background.uri}
+              style={[styles.thumbnail, { borderColor: colors.border }]}
+              contentFit="cover"
+              accessibilityLabel="Your background picture"
+            />
+            <View style={styles.pictureActions}>
+              <Button title="Change" variant="secondary" disabled={busy} onPress={choose} />
+              <Button title="Remove" variant="ghost" disabled={busy} onPress={background.remove} />
+            </View>
+          </Card>
+          <SegmentedControl options={BACKGROUND_STRENGTHS} value={background.strength} onChange={background.setStrength} />
+          <AppText variant="caption" color="muted">
+            How much of the picture shows through. Cards stay solid, so everything stays readable.
+          </AppText>
+        </>
+      ) : (
+        <>
+          <Button title={busy ? "Preparing…" : "Choose picture"} variant="secondary" disabled={busy} onPress={choose} />
+          <AppText variant="caption" color="muted">
+            A photo from your phone behind every screen. It stays on this phone and isn&apos;t part of backups.
+          </AppText>
+        </>
+      )}
+    </View>
   );
 }
 
@@ -162,4 +227,7 @@ const styles = StyleSheet.create({
   swatches: { flexDirection: "row" },
   swatch: { width: 18, height: 30, borderWidth: StyleSheet.hairlineWidth, marginRight: -4, borderRadius: 4 },
   edit: { minWidth: 110 },
+  pictureCard: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md },
+  thumbnail: { width: 72, height: 128, borderRadius: radii.cover, borderWidth: StyleSheet.hairlineWidth },
+  pictureActions: { flex: 1, gap: spacing.sm },
 });

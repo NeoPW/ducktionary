@@ -12,6 +12,7 @@ import { GooseProvider } from "@/components/goose/goose-visits";
 import { ToastProvider } from "@/components/toast";
 import { migrateDbIfNeeded } from "@/db/migrate";
 import { BackupProvider } from "@/sync/backup-provider";
+import { BackgroundProvider } from "@/theme/background";
 import { ThemeProvider, useTheme } from "@/theme/use-theme";
 
 SplashScreen.preventAutoHideAsync();
@@ -63,14 +64,17 @@ function AppShell() {
         {/* Signs in to Supabase (when configured) and keeps the cloud backup up to date. */}
         <BackupProvider>
           {/* Tabs live in (tabs); full-screen flows like the scanner and settings sit above them. */}
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen
-              name="scan"
-              options={{ presentation: "fullScreenModal", animation: "slide_from_bottom" }}
-            />
-            <Stack.Screen name="settings" />
-          </Stack>
+          {/* The optional background picture, drawn by each screen (see ScreenBackground). */}
+          <BackgroundProvider>
+            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen
+                name="scan"
+                options={{ presentation: "fullScreenModal", animation: "slide_from_bottom" }}
+              />
+              <Stack.Screen name="settings" />
+            </Stack>
+          </BackgroundProvider>
         </BackupProvider>
       </GooseProvider>
     </>

@@ -35,6 +35,17 @@ import {
   type Species,
   type WalkFrame,
 } from "@/components/mascot/art";
+import {
+  anyVisitor,
+  pickPartner,
+  pickVisitor,
+  VISITORS,
+  parseVisitorSettings,
+  type PopupAct,
+  type Visitor,
+  type VisitorId,
+  type VisitorSettings,
+} from "@/components/goose/visitors";
 import { PEEK_IMAGES, WALK_IMAGES } from "@/components/mascot/images.generated";
 import { SETTING_KEYS } from "@/storage/keys";
 import { readSetting, writeSetting } from "@/storage/settings";
@@ -44,8 +55,13 @@ import { useTheme } from "@/theme/use-theme";
 type GooseContextValue = {
   enabled: boolean;
   setEnabled: (enabled: boolean) => void;
-  /** Bring the goose over right now. */
-  summon: () => void;
+  /** Who may visit, and how often. */
+  visitors: VisitorSettings;
+  setVisitors: (visitors: VisitorSettings) => void;
+  /** False when every visitor is switched off. */
+  canVisit: boolean;
+  /** Bring a visitor over right now: the given one, or one picked by the user's chances. */
+  summon: (visitor?: Visitor) => void;
   /** Re-reads the saved setting (after a backup was restored). */
   reloadFromStorage: () => void;
 };
@@ -53,6 +69,9 @@ type GooseContextValue = {
 const GooseContext = createContext<GooseContextValue>({
   enabled: true,
   setEnabled: () => {},
+  visitors: parseVisitorSettings(null),
+  setVisitors: () => {},
+  canVisit: true,
   summon: () => {},
   reloadFromStorage: () => {},
 });
@@ -65,22 +84,40 @@ function loadEnabled(): boolean {
   return readSetting(SETTING_KEYS.gooseEnabled) !== "false";
 }
 
+const loadVisitors = () => parseVisitorSettings(readSetting(SETTING_KEYS.gooseVisitors));
+
 /** Provides the goose settings and renders the goose that now and then pops up or waddles through. */
 export function GooseProvider({ children }: { children: ReactNode }) {
   const [enabled, setEnabledState] = useState(loadEnabled);
+  const [visitors, setVisitorsState] = useState(loadVisitors);
   const peek = useRef<GooseHandle>(null);
 
   const setEnabled = (value: boolean) => {
     setEnabledState(value);
     writeSetting(SETTING_KEYS.gooseEnabled, String(value));
   };
+  const setVisitors = (value: VisitorSettings) => {
+    setVisitorsState(value);
+    writeSetting(SETTING_KEYS.gooseVisitors, JSON.stringify(value));
+  };
 
   return (
     <GooseContext
-      value={{ enabled, setEnabled, summon: () => peek.current?.summon(), reloadFromStorage: () => setEnabledState(loadEnabled()) }}
+      value={{
+        enabled,
+        setEnabled,
+        visitors,
+        setVisitors,
+        canVisit: anyVisitor(visitors, AVAILABLE_VISITORS),
+        summon: (visitor) => peek.current?.summon(visitor),
+        reloadFromStorage: () => {
+          setEnabledState(loadEnabled());
+          setVisitorsState(loadVisitors());
+        },
+      }}
     >
       {children}
-      <GooseVisits enabled={enabled} ref={peek} />
+      <GooseVisits enabled={enabled} visitors={visitors} ref={peek} />
     </GooseContext>
   );
 }
@@ -88,10 +125,9 @@ export function GooseProvider({ children }: { children: ReactNode }) {
 
 // ─── The visits ─────────────────────────────────────────────────────────────
 
-type GooseHandle = { summon: () => void };
+type GooseHandle = { summon: (visitor?: Visitor) => void };
 
 /** Pop-up acts: the goose rises from a screen edge, does its thing and ducks away again. */
-type PopupAct = "honk" | "look" | "peck" | "suspicious" | "wink" | "steal" | "wave";
 type Edge = "bottom" | "top" | "left" | "right";
 /** One character popping up; a pop-up visit has one or, now and then, two. */
 type PopupActor = {
@@ -108,7 +144,6 @@ type Visit =
   | { id: number; kind: "popup"; actors: PopupActor[] }
   | { id: number; kind: "waddle"; species: Species; act: "waddle" | "flee"; fromLeft: boolean; bottom: number };
 
-const POPUP_ACTS: readonly PopupAct[] = ["honk", "honk", "look", "peck", "suspicious", "wink", "steal"];
 /** The bottom is the classic windowsill, so it comes up a little more often. */
 const EDGES: readonly Edge[] = ["bottom", "bottom", "top", "left", "right"];
 
@@ -123,8 +158,6 @@ const EDGE_GEOMETRY: Record<Edge, { angle: number; out: [number, number]; head: 
   left: { angle: 90, out: [-1, 0], head: -1 },
   right: { angle: -90, out: [1, 0], head: 1 },
 };
-/** Share of visits where the whole goose waddles across instead of popping up. */
-const WADDLE_SHARE = 0.3;
 const FIRST_VISIT_MS: [number, number] = [25_000, 60_000];
 const NEXT_VISIT_MS: [number, number] = [90_000, 240_000];
 /** Walking speed in points per second, and how often the feet alternate. */
@@ -132,23 +165,20 @@ const WALK_SPEED = 75;
 const STEP_MS = 170;
 
 /**
- * Who can visit: characters whose pop-up or walk set is complete, so a visit never shows a missing pose. Each
- * visit picks one of them at random; now and then a goose and a duckling pop up together.
+ * Who can visit at all: visitors whose pop-up or walk set is complete, so a visit never shows a missing pose.
+ * Which of them come, and how often, is the user's choice (see visitors.ts).
  */
 const POP_UP_LOOKS = PEEK_LOOKS.filter(({ look }) => PEEK_POSES.every((pose) => PEEK_IMAGES[look]?.[pose]));
-const POP_UP_SPECIES = SPECIES.filter((sp) => POP_UP_LOOKS.some((l) => l.species === sp));
-/** The character comes first (so geese and ducklings stay 50/50), then one of its looks. */
-const pickLook = (species: Species) => pick(POP_UP_LOOKS.filter((l) => l.species === species)).look;
-/** Acts a look can play: the wave only where the set has a waving pose. */
-const actsFor = (look: PeekLook): readonly PopupAct[] =>
-  PEEK_IMAGES[look]?.wave ? [...POPUP_ACTS, "wave"] : POPUP_ACTS;
 /** Every pose a set may have, mounted together so switching never flickers. */
 const ALL_PEEK_POSES: readonly PeekPose[] = [...PEEK_POSES, ...OPTIONAL_PEEK_POSES];
 const WADDLE_SPECIES = SPECIES.filter((sp) => WALK_FRAMES.every((frame) => WALK_IMAGES[sp]?.[frame]));
-const CAN_POP_UP = POP_UP_SPECIES.length > 0;
-const CAN_WADDLE = WADDLE_SPECIES.length > 0;
-/** Share of pop-ups where two characters pop up at once. */
-const PAIR_SHARE = 0.2;
+export const AVAILABLE_VISITORS: ReadonlySet<VisitorId> = new Set(
+  VISITORS.filter((v) =>
+    v.kind === "popup"
+      ? POP_UP_LOOKS.some((l) => l.look === v.look) && PEEK_IMAGES[v.look]?.[v.pose] != null
+      : WADDLE_SPECIES.includes(v.species),
+  ).map((v) => v.id),
+);
 
 /** What each character shouts. */
 const SOUND: Record<Species, { loud: string; soft: string }> = {
@@ -159,7 +189,15 @@ const SOUND: Record<Species, { loud: string; soft: string }> = {
 const between = ([min, max]: [number, number]) => min + Math.random() * (max - min);
 const pick = <T,>(items: readonly T[]) => items[Math.floor(Math.random() * items.length)];
 
-function GooseVisits({ enabled, ref }: { enabled: boolean; ref: Ref<GooseHandle> }) {
+function GooseVisits({
+  enabled,
+  visitors,
+  ref,
+}: {
+  enabled: boolean;
+  visitors: VisitorSettings;
+  ref: Ref<GooseHandle>;
+}) {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
@@ -176,34 +214,43 @@ function GooseVisits({ enabled, ref }: { enabled: boolean; ref: Ref<GooseHandle>
     return () => sub.remove();
   }, []);
 
-  const start = () => {
+  const canVisit = anyVisitor(visitors, AVAILABLE_VISITORS);
+
+  const start = (chosen?: Visitor) => {
     visitsSoFar.current += 1;
     const id = Date.now();
-    if (CAN_WADDLE && (!CAN_POP_UP || Math.random() < WADDLE_SHARE)) {
+    const visitor = chosen ?? pickVisitor(visitors, AVAILABLE_VISITORS);
+    if (!visitor) return;
+    if (visitor.kind === "waddle") {
       // Any height between just above the bottom edge and just below the header.
       const lowest = insets.bottom + 4;
       const highest = height - insets.top - 56 - walkSize(width);
       const bottom = lowest + Math.random() * Math.max(0, highest - lowest);
-      const species = pick(WADDLE_SPECIES);
+      const species = visitor.species;
       setVisit({ id, kind: "waddle", species, act: "waddle", fromLeft: Math.random() < 0.5, bottom });
       return;
     }
-    const pair = POP_UP_SPECIES.length > 1 && Math.random() < PAIR_SHARE;
-    const cast = pair ? shuffle(POP_UP_SPECIES) : [pick(POP_UP_SPECIES)];
+    // Now and then a goose and a duckling pop up together.
+    const partner = chosen ? null : pickPartner(visitors, AVAILABLE_VISITORS, visitor);
+    const cast = partner?.kind === "popup" ? [visitor, partner] : [visitor];
     // A pair comes from two different edges, so they never overlap.
     const edges = shuffle(EDGES.filter((e, i) => EDGES.indexOf(e) === i));
     const first = pick(EDGES);
-    const actors = cast.map((species, i) => {
+    const actors = cast.map(({ species, look, act }, i) => {
       const edge = i === 0 ? first : edges.find((e) => e !== first)!;
-      const look = pickLook(species);
       const place = placeOnEdge(edge, peekSize(width), width, height);
-      return { key: species, species, look, act: pick(actsFor(look)), edge, ...place };
+      return { key: species, species, look, act, edge, ...place };
     });
     setVisit({ id, kind: "popup", actors });
   };
 
-  // "Summon the goose" in Settings calls this directly.
-  useImperativeHandle(ref, () => ({ summon: () => !visit && (CAN_POP_UP || CAN_WADDLE) && start() }));
+  // "Summon the goose" in Settings calls this directly; the visitors page summons one particular visitor.
+  useImperativeHandle(ref, () => ({
+    summon: (chosen) => {
+      if (visit) return;
+      if (chosen ? AVAILABLE_VISITORS.has(chosen.id) : canVisit) start(chosen);
+    },
+  }));
 
   // A due visit is skipped while the camera is open or the app is in the background.
   const tryVisit = useEffectEvent(() => {
@@ -217,11 +264,11 @@ function GooseVisits({ enabled, ref }: { enabled: boolean; ref: Ref<GooseHandle>
 
   // Schedule the next surprise visit whenever the goose is away.
   useEffect(() => {
-    if (!enabled || reduceMotion || visit || !(CAN_POP_UP || CAN_WADDLE)) return;
+    if (!enabled || reduceMotion || visit || !canVisit) return;
     const delay = between(visitsSoFar.current === 0 ? FIRST_VISIT_MS : NEXT_VISIT_MS);
     const timer = setTimeout(tryVisit, delay);
     return () => clearTimeout(timer);
-  }, [enabled, reduceMotion, visit, retries]);
+  }, [enabled, reduceMotion, visit, retries, canVisit]);
 
   if (!visit) return null;
 

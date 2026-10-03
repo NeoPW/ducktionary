@@ -3,6 +3,7 @@ import type { SQLiteDatabase } from "expo-sqlite";
 import { notifyLibraryChanged } from "@/db/events";
 import type { Book, BookDraft } from "@/types";
 import { isAcquisition, isFormat, isPriced } from "@/utils/book-attributes";
+import { normalizeRating } from "@/utils/rating";
 
 type BookRow = {
   id: number;
@@ -54,12 +55,6 @@ function toBook(row: BookRow): Book {
   };
 }
 
-/** Rounds to the nearest half star within 0.5–5; anything else becomes unrated. */
-export function normalizeRating(rating: number | null): number | null {
-  if (rating == null || !Number.isFinite(rating)) return null;
-  const rounded = Math.round(rating * 2) / 2;
-  return rounded >= 0.5 ? Math.min(rounded, 5) : null;
-}
 
 function cleanList(values: string[]): string[] {
   const seen = new Set<string>();
@@ -197,6 +192,8 @@ export async function updateBook(db: SQLiteDatabase, id: number, draft: BookDraf
 
 export async function deleteBook(db: SQLiteDatabase, id: number): Promise<void> {
   await db.withExclusiveTransactionAsync(async (txn) => {
+    // Explicitly: foreign keys (and so ON DELETE CASCADE) are off on transaction connections.
+    await txn.runAsync("DELETE FROM book_categories WHERE book_id = ?", id);
     await txn.runAsync("DELETE FROM books WHERE id = ?", id);
     await deleteUnusedCategories(txn);
     await deleteUnusedSeries(txn);

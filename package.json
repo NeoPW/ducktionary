@@ -15,6 +15,8 @@
     "expo-font": "~57.0.4",
     "expo-glass-effect": "~57.0.4",
     "expo-image": "~57.0.5",
+    "expo-image-manipulator": "~57.0.20",
+    "expo-image-picker": "~57.0.20",
     "expo-linking": "~57.0.11",
     "expo-router": "~57.0.23",
     "expo-sharing": "~57.0.22",
@@ -56,7 +58,8 @@
     "mascots:process": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/mascot-process.ts && npm run mascots",
     "supabase:check": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/supabase-security-check.ts",
     "postinstall": "patch-package",
-    "mascots:generate": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/mascot-generate.ts"
+    "mascots:generate": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/mascot-generate.ts",
+    "import:bookstats": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/import-bookstats.ts"
   },
   "private": true
 }

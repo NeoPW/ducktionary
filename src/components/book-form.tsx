@@ -4,14 +4,15 @@ import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, ScrollView, StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/app-text";
-import { BookCover } from "@/components/book-cover";
 import { Button } from "@/components/button";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Dropdown } from "@/components/dropdown";
 import { ChipInput } from "@/components/form/chip-input";
 import { ChoiceChips } from "@/components/form/choice-chips";
+import { CoverPicker } from "@/components/form/cover-picker";
 import { DateField } from "@/components/form/date-field";
 import { RatingField } from "@/components/form/rating-field";
+import { ScreenBackground } from "@/components/screen-background";
 import { FieldShell, TextField } from "@/components/form/text-field";
 import { spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
@@ -102,6 +103,7 @@ export function BookForm({
       behavior="padding"
       keyboardVerticalOffset={headerHeight}
     >
+      <ScreenBackground />
       <ScrollView
         contentContainerStyle={styles.content}
         contentInsetAdjustmentBehavior="automatic"
@@ -110,7 +112,13 @@ export function BookForm({
         {notice}
 
         <View style={styles.hero}>
-          <BookCover title={form.title || "New book"} coverUrl={form.coverUrl} width={84} />
+          <CoverPicker
+            title={form.title || "New book"}
+            coverUrl={form.coverUrl}
+            originalUrl={initialForm.coverUrl}
+            onChange={(coverUrl) => update("coverUrl", coverUrl)}
+            width={84}
+          />
           <View style={styles.heroText}>
             <AppText variant="heading" numberOfLines={3}>
               {form.title || "New book"}

@@ -80,4 +80,4 @@ character 50/50, then one of its looks. Pop-up sets may add an optional `wave.pn
 - [ ] You have the right to use the image (generator terms allow app use)
 
 The app only uses complete sets: goose visits pop up only when all six pop-up poses exist, and waddle only when
-both frames exist. `npm run mascots:icons` rebuilds the app icons from `goose/reading.png`.
+both frames exist. `npm run mascots:icons` rebuilds the app icons from `duckling/reading.png`.

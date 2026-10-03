@@ -51,7 +51,7 @@ and waddle frames for the visits. Each app start casts one of them for every par
 npm run mascots:generate  # draw one image with the OpenAI API (dry run unless --go; see the brief)
 npm run mascots:process   # raw images in docs/mascot-art/raw/ → app-ready images in assets/mascots/
 npm run mascots           # check the images, register them for the app, build docs/mascot-gallery.html
-npm run mascots:icons     # rebuild the app icons from the goose
+npm run mascots:icons     # rebuild the app icons from the reading duckling
 ```
 
 Open `docs/mascot-gallery.html` in a browser to see every image, a demo of the goose visits and the app icons.

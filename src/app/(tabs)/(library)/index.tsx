@@ -10,6 +10,7 @@ import { Button } from "@/components/button";
 import { EmptyScreen, EmptyState } from "@/components/empty-state";
 import { LoadingScreen, Screen } from "@/components/screen";
 import { SearchField } from "@/components/search-field";
+import { hasExampleLibrary, loadExampleLibrary } from "@/db/example-library";
 import { clearAllData, seedSampleBooks } from "@/db/seed";
 import { useBooks } from "@/hooks/use-books";
 import { decodeFilter, encodeFilter, filterChips, filterCount, matchesFilter, withoutKey } from "@/library/filter";
@@ -70,6 +71,16 @@ export default function LibraryScreen() {
                 variant="ghost"
                 onPress={async () => {
                   await seedSampleBooks(db);
+                  await books.reload();
+                }}
+              />
+            )}
+            {__DEV__ && hasExampleLibrary && (
+              <Button
+                title="Load example library (dev)"
+                variant="ghost"
+                onPress={async () => {
+                  await loadExampleLibrary(db);
                   await books.reload();
                 }}
               />

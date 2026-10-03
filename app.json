@@ -48,7 +48,14 @@
           "barcodeScannerEnabled": true
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Ducktionary uses your photos when you pick one as a book cover.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

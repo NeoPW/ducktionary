@@ -7,6 +7,7 @@ import { ACQUISITIONS, FORMATS, isPriced } from "@/utils/book-attributes";
 import { parseIsoDate, readingDays } from "@/utils/dates";
 import { BOOKS, PAGES, plural, type Unit } from "@/utils/format";
 import { LENGTH_CLASSES, lengthClass } from "@/utils/length-class";
+import { STAR_GROUPS, starGroup } from "@/utils/rating";
 
 export type ChartKind =
   | "books-over-time"
@@ -123,21 +124,18 @@ export function buildChart(kind: ChartKind, books: Book[], span: DateSpan, libra
 
     case "ratings": {
       const unrated = books.filter((b) => b.rating == null).length;
-      // One column per half star (½ … 5) so 4.5 isn't lumped in with 4 or 5.
-      const bars = Array.from({ length: 10 }, (_, i) => {
-        const stars = (i + 1) / 2;
-        return {
-          key: String(stars),
-          label: `${Math.floor(stars) || ""}${stars % 1 ? "½" : ""}`,
-          value: books.filter((b) => b.rating === stars).length,
-          filter: { ratings: [stars] },
-        };
-      });
+      // One column per whole star (¼–¾, 1–1¾, …, 5): twenty quarter-star columns would be unreadable.
+      const bars = STAR_GROUPS.map((group) => ({
+        key: String(group.value),
+        label: group.label,
+        value: books.filter((b) => b.rating != null && starGroup(b.rating) === group.value).length,
+        filter: { stars: [group.value] },
+      }));
       return {
         layout: "columns",
         bars,
         unit: BOOKS,
-        // Ten half-star groups are too many slices for a readable pie.
+        // Six star groups in order read better as columns than as slices.
         styles: ["bar", "line"],
         note: joinNotes("Stars you gave.", unrated ? `${plural(unrated, BOOKS)} not rated.` : null),
       };

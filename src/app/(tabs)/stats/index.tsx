@@ -193,16 +193,10 @@ function Tiles({ summary }: { summary: Summary }) {
         value={summary.topCategory?.name ?? "–"}
         detail={summary.topCategory ? plural(summary.topCategory.books, BOOKS) : undefined}
       />
-      <StatTile label="Authors" value={summary.authors.toLocaleString()} detail="different authors" />
       <StatTile
         label="Spent"
         value={summary.pricedBooks ? formatPrice(summary.spentCents) : "–"}
         detail={summary.pricedBooks ? `on ${plural(summary.pricedBooks, BOOKS)}` : "no prices yet"}
-      />
-      <StatTile
-        label="Average price"
-        value={summary.pricedBooks ? formatPrice(Math.round(summary.spentCents / summary.pricedBooks)) : "–"}
-        detail="per bought book"
       />
     </View>
   );

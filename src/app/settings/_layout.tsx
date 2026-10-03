@@ -9,6 +9,7 @@ export default function SettingsLayout() {
       <Stack.Screen name="scheme/[id]" options={{ title: "Edit colours" }} />
       <Stack.Screen name="account" options={{ title: "Account" }} />
       <Stack.Screen name="backups" options={{ title: "Restore a backup" }} />
+      <Stack.Screen name="visitors" options={{ title: "Visitors" }} />
     </Stack>
   );
 }

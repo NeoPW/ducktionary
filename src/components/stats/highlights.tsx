@@ -11,6 +11,7 @@ import { spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
 import type { Book } from "@/types";
 import { BOOKS, DAYS, plural } from "@/utils/format";
+import { ratingLabel } from "@/utils/rating";
 
 /** One thing a highlight points at — a book or a series. Tied items can be swiped through. */
 type Item = { key: string; title: string; coverUrl: string | null; value: string; open: () => void };
@@ -46,7 +47,7 @@ export function Highlights({ summary }: { summary: Summary }) {
     rows.push({ label: "Longest read", items: bookItems(summary.slowest.books, () => plural(days, DAYS)) });
   }
   if (summary.favourite.length > 0) {
-    rows.push({ label: "Favourite", items: bookItems(summary.favourite, (b) => `${b.rating} ★`) });
+    rows.push({ label: "Favourite", items: bookItems(summary.favourite, (b) => `${ratingLabel(b.rating!)} ★`) });
   }
   if (summary.longestSeries.length > 0) {
     rows.push({

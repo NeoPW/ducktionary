@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ScreenBackground } from "@/components/screen-background";
 import { spacing } from "@/theme/tokens";
 import { useTheme } from "@/theme/use-theme";
 
@@ -30,20 +31,24 @@ export function Screen({ children, scroll = true, contentStyle }: ScreenProps) {
   if (!scroll) {
     return (
       <View style={[styles.fill, { backgroundColor: colors.background }, contentStyle]}>
+        <ScreenBackground />
         {children}
       </View>
     );
   }
 
   return (
-    <ScrollView
-      style={[styles.fill, { backgroundColor: colors.background }]}
-      contentContainerStyle={[styles.content, { paddingBottom: spacing.lg + bottomInset }, contentStyle]}
-      contentInsetAdjustmentBehavior="automatic"
-      keyboardShouldPersistTaps="handled"
-    >
-      {children}
-    </ScrollView>
+    <View style={[styles.fill, { backgroundColor: colors.background }]}>
+      <ScreenBackground />
+      <ScrollView
+        style={styles.fill}
+        contentContainerStyle={[styles.content, { paddingBottom: spacing.lg + bottomInset }, contentStyle]}
+        contentInsetAdjustmentBehavior="automatic"
+        keyboardShouldPersistTaps="handled"
+      >
+        {children}
+      </ScrollView>
+    </View>
   );
 }
 
